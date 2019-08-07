@@ -97,7 +97,7 @@ func (c *Client) Connect( endpoints []string  ) bool {
 
     cli, err := clientv3.New(clientv3.Config{
         Endpoints:   endpoints ,
-        DialTimeout: 5*time.Second ,
+        DialTimeout: dialTimeout ,
         TLS:         tlsConfig ,
     })
     if err != nil {
