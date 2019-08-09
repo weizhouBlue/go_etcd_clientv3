@@ -268,4 +268,46 @@ func Test_lock(t *testing.T){
 }
 
 
+//====================================
+
+func Test_elect(t *testing.T){
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+	topic:="myelect"
+
+	sh_close:=c.ElectUntilLeader( topic  , "host_test" )
+	if sh_close==nil {
+		fmt.Println(  "failed to elect for " , topic )
+		t.FailNow()		
+	}
+	defer close(sh_close)
+	fmt.Println(  "be the leader for " , topic )
+
+	time.Sleep(10*time.Second)
+
+	leader , ok:= c.GetElectLeader( topic  )
+	if !ok {
+		fmt.Println(  "failed to get the leader" )
+		t.FailNow()
+	}
+
+	fmt.Println(  "found leader " , leader )
+
+
+	time.Sleep(10*time.Second)
+
+
+}
+
+
+
 

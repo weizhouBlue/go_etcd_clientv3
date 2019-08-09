@@ -332,7 +332,8 @@ func (c *Client) PutWithLease( keyMap map[string]string , ttl int64 ) ( ch_alive
     clog.Log( clog.Debug, "succeeded to create a lease with id=%d \n" , resp.ID )
 
     // 会产生一个后端进程，会一直 保持该 lease id 被keepalive
-    ch, kaerr := c.cli.KeepAlive( context.TODO() , resp.ID)
+    keep_ctx, keep_cancel := context.WithCancel(context.Background())
+    ch, kaerr := c.cli.KeepAlive( keep_ctx , resp.ID)
     if kaerr != nil {
     	clog.Log( clog.Err , "failed to keepalive the lease id=%d \n" , resp.ID )    
         clog.Log( clog.Err , "%v" , err)
@@ -351,6 +352,7 @@ func (c *Client) PutWithLease( keyMap map[string]string , ttl int64 ) ( ch_alive
     go func(){
     	<-ch_close
     	clog.Log(clog.Debug, "receive signal to delete lease id=%q \n" , resp.ID )
+    	keep_cancel()
     	if ! c.deleteLease(resp.ID){
     		clog.Log(clog.Err, "failed to delete lease id=%q \n" , resp.ID )
     	}
@@ -407,7 +409,7 @@ func (c *Client) Lock( lockName string ) (ch_unlock chan bool) {
 
     // acquire lock 
     clog.Log( clog.Debug, "waiting for lock %q \n" , lockName  )    
-    if err := mutex_lock.Lock(context.TODO()); err != nil {
+    if err := mutex_lock.Lock( context.TODO() ); err != nil {
     	clog.Log( clog.Err , "failed to create session for  %q \n" , lockName  )    
         clog.Log( clog.Err , "%v" , err)
         new_session.Close()
@@ -420,7 +422,7 @@ func (c *Client) Lock( lockName string ) (ch_unlock chan bool) {
     	<-ch_unlock
     	clog.Log( clog.Debug , "begin to unlock %q \n" , lockName  ) 
     	new_session.Close()
-	    if err := mutex_lock.Unlock(context.TODO()); err != nil {
+	    if err := mutex_lock.Unlock( context.TODO() ); err != nil {
 	    	clog.Log( clog.Err , "failed to unlock %q \n" , lockName  )    
 	        clog.Log( clog.Err , "%v" , err)
     		return
@@ -430,6 +432,100 @@ func (c *Client) Lock( lockName string ) (ch_unlock chan bool) {
 
     return ch_unlock
 }
+
+
+func (c *Client) ElectUntilLeader( topic  , myName string ) ( ch_close chan bool ) {
+    clog.Log( clog.Debug, "Elect for %q with name %q \n" , topic , myName )
+
+    if c.cli == nil {
+    	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
+    	return nil
+    }
+
+    if len(topic) == 0 {
+    	clog.Log( clog.Err , "miss topic \n" )    
+    	return nil    	
+    }
+    if len(myName) == 0 {
+    	clog.Log( clog.Err , "miss myName \n" )    
+    	return nil    	
+    }
+
+	session_new, err := concurrency.NewSession( c.cli )
+	if err != nil {
+    	clog.Log( clog.Err , "failed to create session for  %q \n" , topic  )    
+        clog.Log( clog.Err , "%v" , err)
+    	return nil
+	}
+	elect := concurrency.NewElection( session_new , topic )
+
+    ctx, cancel := context.WithCancel(context.Background())
+    if err := elect.Campaign( ctx , myName ); err != nil {
+    	clog.Log( clog.Err , "failed to Campaign for  %q \n" , topic  )    
+        clog.Log( clog.Err , "%v" , err)
+        session_new.Close()
+    	return nil
+    }
+    clog.Log( clog.Debug, "succeeded to Elect for %q with name %q \n" , topic , myName )
+
+    ch_close = make(chan bool)
+	go func(){
+		<-ch_close
+    	clog.Log( clog.Debug, "receive single to stop Elect for %q with name %q \n" , topic , myName )
+		cancel()
+		session_new.Close()
+	}()
+
+	return ch_close
+}
+
+
+
+func (c *Client) GetElectLeader( topic string  ) (leader string  , ok bool) {
+    clog.Log( clog.Debug, "GetElectLeader for %q \n" , topic  )
+
+    if c.cli == nil {
+    	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
+    	return "" , false
+    }
+
+    if len(topic) == 0 {
+    	clog.Log( clog.Err , "miss topic \n" )    
+    	return "" , false   	
+    }
+
+	session_new, err := concurrency.NewSession( c.cli )
+	if err != nil {
+    	clog.Log( clog.Err , "failed to create session for  %q \n" , topic  )    
+        clog.Log( clog.Err , "%v" , err)
+    	return "" , false
+	}
+	defer session_new.Close()
+	elect := concurrency.NewElection( session_new , topic )
+
+
+    ctx, _ := context.WithTimeout(context.Background(), 2 * time.Second )
+    if ch := elect.Observe( ctx ) ; ch!=nil {
+    	if v , ok := <- ch ; ok {
+    		//leader=string(v.Kvs[0].Value)
+		    //clog.Log( clog.Debug, "GetElectLeader found a leader %q for %q \n" , leader , topic  )
+		    for n , v := range v.Kvs {
+		    	clog.Log( clog.Debug, "GetElectLeader found %n a leader %q for %q \n" , n , string(v.Value) , topic  )
+		    	leader=string(v.Value)
+		    }
+    	}else{
+		    clog.Log( clog.Debug, "there is no leader for %q  \n" , topic   )
+		    return "" , true
+    	}
+    }else{
+		clog.Log( clog.Err, "failed to create Observe for %q \n"  , topic  )
+		return "" , false
+    }
+
+	return leader , true
+}
+
+
 
 
 func (c *Client) Close() {
