@@ -9,7 +9,7 @@ import (
 
 //====================================
 
-func Test_ttl(t *testing.T){
+func Test_instance_config(t *testing.T){
 	log.Config(  log.Debug , " test module" , "" )  
 
 	var c etcd.Client
@@ -27,6 +27,26 @@ func Test_ttl(t *testing.T){
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 }
+
+
+
+func Test_GloablConfig(t *testing.T){
+	log.Config(  log.Debug , " test global module" , "" )  
+
+	etcd.Global_Tls_ca="./test-tls-cert/etcd-ca"
+	etcd.Global_Tls_cert="./test-tls-cert/etcd-cert"
+	etcd.Global_Tls_key="./test-tls-cert/etcd-key"
+	etcd.Global_endpoints=[]string {"https://10.6.185.150:12379" }
+
+	c:= etcd.Client{}
+	if ! c.Connect( nil ) {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+}
+
 
 
 //====================================

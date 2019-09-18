@@ -34,6 +34,14 @@ const(
 	EventDelete EventWatch =1
 )
 
+var (
+    Global_Tls_cert string
+    Global_Tls_ca string 
+    Global_Tls_key string
+    Global_endpoints []string
+)
+
+
 
 type Client struct{
 	Tls_cert string
@@ -55,35 +63,52 @@ func existFile( filePath string ) bool {
 
 func (c *Client) Connect( endpoints []string  ) bool {
 
-    clog.Log(clog.Info , "etcd client try to connect to server %v " , endpoints  )
-
-
 	var tlsConfig *tls.Config
+    var etcd_endpoints []string
+    var etcd_ca string
+    var etcd_key string
+    var etcd_cert string
 
-	if len(endpoints) ==0 {
+	if len(endpoints) ==0 && len(Global_endpoints)==0  {
     	clog.Log(clog.Err ," no input of etcd server "  )
 		return false
-	}
 
-	//if len( c.Tls_ca)!=0 || len( c.Tls_key)!=0 || len( c.Tls_cert)!=0 {
-	if strings.Contains( endpoints[0] , "https" ) {
-		if existFile( c.Tls_ca)==false   {
+	}else if len(endpoints) ==0 && len(Global_endpoints)!=0  {
+        clog.Log(clog.Debug ," use gloabl endpoints "  )
+        etcd_endpoints=Global_endpoints
+        etcd_ca=Global_Tls_ca
+        etcd_key=Global_Tls_key
+        etcd_cert=Global_Tls_cert
+
+    }else if len(endpoints) !=0 {
+        clog.Log(clog.Debug ," use instance endpoints "  )
+        etcd_endpoints=endpoints
+        etcd_ca=c.Tls_ca
+        etcd_key=c.Tls_key
+        etcd_cert=c.Tls_cert
+    } 
+
+    clog.Log(clog.Info , "etcd client try to connect to server %v " , etcd_endpoints  )
+
+
+	if strings.Contains( etcd_endpoints[0] , "https" ) {
+		if existFile( etcd_ca )==false   {
     		clog.Log(clog.Err ,"error, no file cert-ca "  )
 			return false
 		}
-		if existFile( c.Tls_key)==false   {
+		if existFile( etcd_key )==false   {
     		clog.Log(clog.Err ,"error, no file cert-key "  )
 			return false
 		}
-		if existFile( c.Tls_cert)==false   {
+		if existFile( etcd_cert )==false   {
     		clog.Log(clog.Err ,"error, no file cert-cert "  )
 			return false
 		}
 
 	    tlsInfo := transport.TLSInfo{
-	        CertFile:       c.Tls_cert ,
-	        KeyFile:        c.Tls_key ,
-	        TrustedCAFile:  c.Tls_ca ,
+	        CertFile:       etcd_cert ,
+	        KeyFile:        etcd_key  ,
+	        TrustedCAFile:  etcd_ca ,
 	    }
 	    info, err := tlsInfo.ClientConfig()
 	    if err != nil {
@@ -96,7 +121,7 @@ func (c *Client) Connect( endpoints []string  ) bool {
 	}
 
     cli, err := clientv3.New(clientv3.Config{
-        Endpoints:   endpoints ,
+        Endpoints:   etcd_endpoints ,
         DialTimeout: dialTimeout ,
         TLS:         tlsConfig ,
     })
