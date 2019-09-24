@@ -187,33 +187,46 @@ func (c *Client) Get( key string) (string , bool) {
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
     resp, err := c.cli.Get(ctx, key )
     cancel()
-    if err != nil || len(resp.Kvs)==0 {
+    clog.Log(clog.Info, "response=%v \n" , resp)
+
+    if err != nil  {
         clog.Log(clog.Err, "failed to get etcd key=%s \n" , key)
         clog.Log(clog.Err , "%v" , err)
         return "",false
     }
-   	result := resp.Kvs[0].Value     
-    clog.Log(clog.Debug, "succeeded to get %s=%s \n" , key , result )
-    return string(result) , true
+
+
+    if len(resp.Kvs)==0 {
+        return "" , true
+    }else{
+        result := resp.Kvs[0].Value     
+        return string(result) , true
+    }
+
 }
 
 
 
-func (c *Client) GetPrefix( prefix string) map[string]string  {
+func (c *Client) GetPrefix( prefix string) ( map[string]string  , bool ) {
     clog.Log( clog.Debug, "GetPrefix etcd  prefix=%s \n" , prefix  )
 
     if c.cli == nil {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
-    	return nil
+    	return nil , false
     }
 
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
     resp, err := c.cli.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))
     cancel()
-    if err != nil || len(resp.Kvs)==0 {
+    clog.Log(clog.Info, "response=%v \n" , resp)
+
+    if err != nil {
         clog.Log(clog.Err, "failed to get etcd key=%s \n" , prefix)
         clog.Log(clog.Err , "%v" , err)
-        return nil
+        return nil , false
+    }
+    if len(resp.Kvs)==0 {
+        return nil , true
     }
 
     result := make( map[string] string ) 
@@ -222,7 +235,7 @@ func (c *Client) GetPrefix( prefix string) map[string]string  {
         result[ string(ev.Key) ]= string(ev.Value)
     }
     clog.Log(clog.Debug, "succeeded to GetPrefix %v \n"  , result )
-    return result
+    return result , true
 }
 
 

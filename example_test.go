@@ -66,6 +66,33 @@ func Test_basic(t *testing.T){
 	defer c.Close()
 
 
+
+	val , ok = c.Get("/a20" )
+	if !ok {
+		fmt.Println("failed to get ")
+		t.FailNow()		
+	}
+	if len(val)==0 {
+		fmt.Printf("key is empty \n" )
+	}else{
+		fmt.Printf("succeeded to get %s \n" , val )
+	}
+
+
+
+	if v , ok:= c.GetPrefix("/bbbb") ; ok {
+		if v==nil {
+			fmt.Printf("prefix is empty  \n" )
+		}else{
+			fmt.Printf("succeeded to GetPrefix %v \n" , v )
+		}
+	}else{
+		fmt.Println("failed to GetPrefix ")
+		t.FailNow()			
+	}
+
+
+
 	if ! c.Put("/a1" , "100") {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
@@ -83,12 +110,20 @@ func Test_basic(t *testing.T){
 		fmt.Println("failed to get ")
 		t.FailNow()		
 	}
-	fmt.Printf("succeeded to get %s \n" , val )
+	if len(val)==0 {
+		fmt.Printf("key is empty \n" )
+	}else{
+		fmt.Printf("succeeded to get %s \n" , val )
+	}
 
 
 
-	if v:= c.GetPrefix("/a") ; v!=nil{
-		fmt.Printf("succeeded to GetPrefix %v \n" , v )
+	if v , ok:= c.GetPrefix("/a") ; ok {
+		if v==nil {
+			fmt.Printf("prefix is empty  \n" )
+		}else{
+			fmt.Printf("succeeded to GetPrefix %v \n" , v )
+		}
 	}else{
 		fmt.Println("failed to GetPrefix ")
 		t.FailNow()			
