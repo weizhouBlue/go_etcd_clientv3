@@ -323,31 +323,6 @@ func Test_lock(t *testing.T){
 }
 
 
-func Test_lock_withtimeout(t *testing.T){
-	log.Config(  log.Debug , " test module" , "" )  
-
-	var c etcd.Client
-
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
-		fmt.Println(  "failed to connect to etcd server" )
-		t.FailNow()
-	}
-	fmt.Println( "succeeded to connect to etcd server" )
-	defer c.Close()
-
-
-	ch_close:=c.Lock("mylock_test" , 5 )
-	if ch_close==nil {
-		fmt.Println(  "failed to lock" )
-		t.FailNow()
-	}
-
-	fmt.Println(  "get lock" )
-	time.Sleep(20*time.Second)
-
-	close(ch_close)
-
-}
 
 
 //====================================

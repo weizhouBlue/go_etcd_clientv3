@@ -144,6 +144,11 @@ func (c *Client) Put( key string , value string  , lease_id ... clientv3.LeaseID
     	return false
     }
 
+    if len(key)==0 {
+        clog.Log( clog.Err , "error, key is empty \n" )    
+        return false
+    }
+
     var err error
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
     if len(lease_id) > 0 && int64(lease_id[0]) > 0 {
@@ -184,6 +189,12 @@ func (c *Client) Get( key string) (string , bool) {
     	return "" , false
     }
 
+    if len(key)==0 {
+        clog.Log( clog.Err , "error, key is empty \n" )    
+        return "" , false 
+    }
+
+
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
     resp, err := c.cli.Get(ctx, key )
     cancel()
@@ -214,6 +225,12 @@ func (c *Client) GetPrefix( prefix string) ( map[string]string  , bool ) {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
     	return nil , false
     }
+
+    if len(prefix)==0 {
+        clog.Log( clog.Err , "error, prefix is empty \n" )    
+        return nil , false
+    }
+
 
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
     resp, err := c.cli.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))
@@ -247,6 +264,13 @@ func (c *Client) Delete( key string , prefixFlag bool  ) bool {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
     	return false
     }
+
+
+    if len(key)==0 {
+        clog.Log( clog.Err , "error, key is empty \n" )    
+        return false
+    }
+
 
     var err error
     ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
@@ -294,6 +318,11 @@ func (c *Client) WatchByHandler( key string , prefixFlag bool ,	caller func(evne
     if c.cli == nil {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
     	return nil
+    }
+
+    if len(key)==0 {
+        clog.Log( clog.Err , "error, key is empty \n" )    
+        return nil
     }
 
     var eventChan clientv3.WatchChan
@@ -423,7 +452,7 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
 
 
 
-func (c *Client) Lock( lockName string , timeout ... int   ) (ch_unlock chan bool) {
+func (c *Client) Lock( lockName string   ) (ch_unlock chan bool) {
     clog.Log( clog.Debug, "lock for %q \n" , lockName  )
 
     if c.cli == nil {
@@ -448,22 +477,8 @@ func (c *Client) Lock( lockName string , timeout ... int   ) (ch_unlock chan boo
     // acquire lock 
 
 
-    var ctx context.Context
-    if timeout==nil {
-        ctx = context.TODO()
-        clog.Log( clog.Debug, "waiting for lock %q without timeout \n" , lockName  )
-    }else{
-        if timeout[0] <= 0 {
-            clog.Log( clog.Err, "erro timeout=%dseconds , eixt \n" , timeout[0]  )
-            return nil
-        }
-        tmp := time.Duration(timeout[0])
-        ctx, _ = context.WithTimeout(context.Background(), tmp * time.Second )
-        clog.Log( clog.Debug, "waiting for lock %q with timeout=%dseconds \n" , lockName , timeout[0]  )
-    }
-    
-
-    if err := mutex_lock.Lock( ctx ); err != nil {
+    clog.Log( clog.Debug, "waiting for lock %q  \n" , lockName  )
+    if err := mutex_lock.Lock( context.TODO() ); err != nil {
     	clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
         clog.Log( clog.Err , "%v" , err)
         new_session.Close()
@@ -475,12 +490,15 @@ func (c *Client) Lock( lockName string , timeout ... int   ) (ch_unlock chan boo
     go func(){
     	<-ch_unlock
     	clog.Log( clog.Debug , "begin to unlock %q \n" , lockName  ) 
-    	new_session.Close()
+    	
 	    if err := mutex_lock.Unlock( context.TODO() ); err != nil {
 	    	clog.Log( clog.Err , "failed to unlock %q \n" , lockName  )    
 	        clog.Log( clog.Err , "%v" , err)
+            new_session.Close()
     		return
 	    }
+        new_session.Close()
+
     	clog.Log( clog.Debug , "succeeded to unlock %q \n" , lockName  ) 	    
     }()
 
