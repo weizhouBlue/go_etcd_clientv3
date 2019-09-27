@@ -423,7 +423,7 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
 
 
 
-func (c *Client) Lock( lockName string ) (ch_unlock chan bool) {
+func (c *Client) Lock( lockName string , timeout ... int   ) (ch_unlock chan bool) {
     clog.Log( clog.Debug, "lock for %q \n" , lockName  )
 
     if c.cli == nil {
@@ -440,15 +440,31 @@ func (c *Client) Lock( lockName string ) (ch_unlock chan bool) {
     new_session , err := concurrency.NewSession( c.cli )
     if err != nil {
     	clog.Log( clog.Err , "failed to create session for  %q \n" , lockName  )    
-        clog.Log( clog.Err , "%v" , err)
+        clog.Log( clog.Err , "%v \n" , err)
     	return nil
     }
     mutex_lock := concurrency.NewMutex( new_session , lockName )
 
     // acquire lock 
-    clog.Log( clog.Debug, "waiting for lock %q \n" , lockName  )    
-    if err := mutex_lock.Lock( context.TODO() ); err != nil {
-    	clog.Log( clog.Err , "failed to create session for  %q \n" , lockName  )    
+
+
+    var ctx context.Context
+    if timeout==nil {
+        ctx = context.TODO()
+        clog.Log( clog.Debug, "waiting for lock %q without timeout \n" , lockName  )
+    }else{
+        if timeout[0] <= 0 {
+            clog.Log( clog.Err, "erro timeout=%dseconds , eixt \n" , timeout[0]  )
+            return nil
+        }
+        tmp := time.Duration(timeout[0])
+        ctx, _ = context.WithTimeout(context.Background(), tmp * time.Second )
+        clog.Log( clog.Debug, "waiting for lock %q with timeout=%dseconds \n" , lockName , timeout[0]  )
+    }
+    
+
+    if err := mutex_lock.Lock( ctx ); err != nil {
+    	clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
         clog.Log( clog.Err , "%v" , err)
         new_session.Close()
     	return nil
