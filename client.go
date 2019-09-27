@@ -452,7 +452,7 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
 
 
 
-func (c *Client) Lock( lockName string   ) (ch_unlock chan bool) {
+func (c *Client) Lock( lockName string    ) (ch_unlock chan bool) {
     clog.Log( clog.Debug, "lock for %q \n" , lockName  )
 
     if c.cli == nil {
@@ -477,14 +477,29 @@ func (c *Client) Lock( lockName string   ) (ch_unlock chan bool) {
     // acquire lock 
 
 
-    clog.Log( clog.Debug, "waiting for lock %q  \n" , lockName  )
-    if err := mutex_lock.Lock( context.TODO() ); err != nil {
-    	clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
-        clog.Log( clog.Err , "%v" , err)
-        new_session.Close()
-    	return nil
-    }
-    clog.Log( clog.Debug , "acquired lock %q \n" , lockName  ) 
+    // if waitAcquireLock {
+
+    //     clog.Log( clog.Debug, "waiting for lock %q without wait mode \n" , lockName  )
+    //     if err := mutex_lock.TryLock( context.TODO() ); err != nil {
+    //         clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
+    //         clog.Log( clog.Err , "%v" , err)
+    //         new_session.Close()
+    //         return nil
+    //     }
+    // }else {
+
+        clog.Log( clog.Debug, "waiting for lock %q  with wait mode \n" , lockName  )
+        if err := mutex_lock.Lock( context.TODO() ); err != nil {
+        	clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
+            clog.Log( clog.Err , "%v" , err)
+            new_session.Close()
+        	return nil
+        }
+
+    //}
+    //clog.Log( clog.Debug , "acquired lock %q \n" , lockName  ) 
+
+
 
     ch_unlock = make(chan bool)
     go func(){
