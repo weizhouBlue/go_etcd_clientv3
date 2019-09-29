@@ -296,6 +296,8 @@ func Test_watch2(t *testing.T){
 
 //====================================
 
+
+
 func Test_lock(t *testing.T){
 	log.Config(  log.Debug , " test module" , "" )  
 
@@ -309,34 +311,8 @@ func Test_lock(t *testing.T){
 	defer c.Close()
 
 
-	ch_close:=c.Lock("/mylock" )
-	if ch_close==nil {
-		fmt.Println(  "failed to lock" )
-		t.FailNow()
-	}
-	fmt.Println(  "get lock" )
-	time.Sleep(20*time.Second)
-
-	close(ch_close)
-	time.Sleep(10*time.Second)
-
-}
-
-
-func Test_lock_withtimeout(t *testing.T){
-	log.Config(  log.Debug , " test module" , "" )  
-
-	var c etcd.Client
-
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
-		fmt.Println(  "failed to connect to etcd server" )
-		t.FailNow()
-	}
-	fmt.Println( "succeeded to connect to etcd server" )
-	defer c.Close()
-
-
-	ch_close:=c.Lock("bbbb"   )
+	//ch_close:=c.TryLock("ccc" , 3  )
+	ch_close:=c.TryLock("ccc" , 0  )
 	if ch_close==nil {
 		fmt.Println(  "failed to lock" )
 		t.FailNow()
@@ -352,16 +328,18 @@ func Test_lock_withtimeout(t *testing.T){
 
 
 
-	time.Sleep(20*time.Second)
+	time.Sleep(10*time.Second)
 
 	close(ch_close)
+	time.Sleep(10*time.Second)
 
 }
 
 
 //====================================
 
-func Test_elect(t *testing.T){
+
+func Test_elect_get(t *testing.T){
 	log.Config(  log.Debug , " test module" , "" )  
 
 	var c etcd.Client
@@ -373,17 +351,9 @@ func Test_elect(t *testing.T){
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 
-	topic:="myelect"
+	topic:="mytopic"
 
-	sh_close:=c.ElectUntilLeader( topic  , "host_test" )
-	if sh_close==nil {
-		fmt.Println(  "failed to elect for " , topic )
-		t.FailNow()		
-	}
-	defer close(sh_close)
-	fmt.Println(  "be the leader for " , topic )
 
-	time.Sleep(10*time.Second)
 
 	leader , ok:= c.GetElectLeader( topic  )
 	if !ok {
@@ -391,7 +361,82 @@ func Test_elect(t *testing.T){
 		t.FailNow()
 	}
 
-	fmt.Println(  "found leader " , leader )
+	fmt.Println(  "found leader , with name=" , leader )
+
+
+
+
+}
+
+
+
+func Test_try_elect(t *testing.T){
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+	topic:="mytopic"
+
+	//sh_close:=c.ElectLeader( topic  , "host_test" , 2 )
+	sh_close:=c.ElectLeader( topic  , "host_test" , 0 )
+
+	if sh_close==nil {
+		fmt.Println(  "failed to elect for " , topic )
+		t.FailNow()		
+	}
+	fmt.Println(  "be the leader for " , topic )
+
+	time.Sleep(20*time.Second)
+
+	leader , ok:= c.GetElectLeader( topic  )
+	if !ok {
+		fmt.Println(  "failed to get the leader" )
+		t.FailNow()
+	}
+
+	fmt.Println(  "found leader , with name=" , leader )
+
+
+	close(sh_close)
+	time.Sleep(10*time.Second)
+
+
+}
+
+
+//============
+func Test_txn_exec (t *testing.T){
+
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+
+	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
+	ok := c.TxnExec( []etcd.TxnOpStruct {
+				etcd.TxnOpPut("v1" , "110") ,
+				etcd.TxnOpPut("v2" , "120") ,
+				etcd.TxnOpGet("v4" ) ,
+				etcd.TxnOpDelete("v3" ) ,
+			})
+	if !ok {
+		fmt.Println(  "failed to Test_txn_exec " )		
+		t.FailNow()
+	}
 
 
 	time.Sleep(10*time.Second)
@@ -400,5 +445,63 @@ func Test_elect(t *testing.T){
 }
 
 
+
+func Test_txn_compare (t *testing.T){
+
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+
+	if ! c.Put("v1" , "100") {
+		fmt.Println("failed to put etcd")
+		t.FailNow()		
+	}
+	if ! c.Put("v2" , "110") {
+		fmt.Println("failed to put etcd")
+		t.FailNow()		
+	}
+
+
+	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
+
+	cmplist  := []etcd.TxnCmpStruct {
+		etcd.TxnCompare(etcd.Value("v1"), "=", "100") ,
+		etcd.TxnCompare(etcd.Value("v2"), "=", "110") ,
+
+	}
+	thenlist :=[]etcd.TxnOpStruct {
+				etcd.TxnOpPut("flag" , "true") ,
+			}
+	elselist:=[]etcd.TxnOpStruct {
+				etcd.TxnOpPut("flag" , "false") ,
+			}
+	result, ok := c.TxnExecCmpValue(  cmplist , thenlist , elselist )
+	//c.TxnExecCmpValue(  cmplist , thenlist , nil )
+	if ok {
+		if result {
+			fmt.Println(  "execute then list " )		
+		}else{
+			fmt.Println(  "execute else list " )		
+		}
+
+	}else{
+		fmt.Println(  "failed to Test_txn_exec " )		
+		t.FailNow()
+
+	}
+
+
+	time.Sleep(10*time.Second)
+
+
+}
 
 
