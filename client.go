@@ -342,18 +342,18 @@ func (c *Client) WatchByHandler( key string , prefixFlag bool ,	caller func(evne
     	for{
     		select {
     			case <-ch_stop :
-    				clog.Log( clog.Debug , "end watching , receive signal to stop watch, for %q[prefix=%q] \n" , key , prefixFlag)    
+    				clog.Log( clog.Debug , "end watching , receive signal to stop watch, for %+v[prefix=%+v] \n" , key , prefixFlag)    
     				c.cli.Watcher.Close()
     				return 
 
     			case data , ok := <- eventChan :
     				if ok {
 				        if data.Canceled {
-    						clog.Log( clog.Err , "end watching , Watch was interrupted , for %q[prefix=%q] \n" , key , prefixFlag )    
+    						clog.Log( clog.Err , "end watching , Watch was interrupted , for %+v[prefix=%+v] \n" , key , prefixFlag )    
 				        	return
 				        }
 				        for n, ev := range data.Events {
-    						clog.Log( clog.Debug , "evnet %d : %s ,  key=%q  new val=%q  \n", n , ev.Type, ev.Kv.Key, ev.Kv.Value )
+    						clog.Log( clog.Debug , "evnet %d : %s ,  key=%+v  new val=%+v  \n", n , ev.Type, ev.Kv.Key, ev.Kv.Value )
     						oldVal := ""
     						if ev.PrevKv!=nil{
     							oldVal=string(ev.PrevKv.Value)
@@ -361,7 +361,7 @@ func (c *Client) WatchByHandler( key string , prefixFlag bool ,	caller func(evne
     						caller( ev.Type , string(ev.Kv.Key) ,  string(ev.Kv.Value) , oldVal )
 				        }
     				}else{
-    					clog.Log( clog.Err , "end watching  ,watch channel was closed , for %q[prefix=%q] \n" , key , prefixFlag)    
+    					clog.Log( clog.Err , "end watching  ,watch channel was closed , for %+v[prefix=%+v] \n" , key , prefixFlag)    
     					return
     				}
     		}
@@ -425,19 +425,19 @@ func (c *Client) PutWithLease( keyMap map[string]string , ttl int64 ) ( ch_alive
     ch_close := make(chan bool)
     go func(){
     	<-ch_close
-    	clog.Log(clog.Debug, "receive signal to delete lease id=%q \n" , resp.ID )
+    	clog.Log(clog.Debug, "receive signal to delete lease id=%+v \n" , resp.ID )
     	keep_cancel()
     	if ! c.deleteLease(resp.ID){
-    		clog.Log(clog.Err, "failed to delete lease id=%q \n" , resp.ID )
+    		clog.Log(clog.Err, "failed to delete lease id=%+v \n" , resp.ID )
     	}
-    	clog.Log(clog.Debug, "succeeded to delete lease id=%q \n" , resp.ID )
+    	clog.Log(clog.Debug, "succeeded to delete lease id=%+v \n" , resp.ID )
     }()
 
     return ch , int64(resp.ID) , ch_close
 }
 
 func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
-    clog.Log( clog.Debug, "deleteLease  id=%q \n" , lease_id  )
+    clog.Log( clog.Debug, "deleteLease  id=%+v \n" , lease_id  )
 
     if c.cli == nil {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
@@ -448,12 +448,12 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
     _, err := c.cli.Revoke( ctx ,   lease_id )
     cancel()
     if err != nil {
-    	clog.Log( clog.Err , "failed to deleteLease id=%q \n" , lease_id  )    
+    	clog.Log( clog.Err , "failed to deleteLease id=%+v \n" , lease_id  )    
         clog.Log( clog.Err , "%v" , err)
     	return false
     }
 
-    clog.Log(clog.Debug, "succeeded to deleteLease id=%q \n" , lease_id )
+    clog.Log(clog.Debug, "succeeded to deleteLease id=%+v \n" , lease_id )
     return true
 }
 
@@ -464,7 +464,7 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
 
 
 func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_unlock  , wait_finish_closing chan bool ,  ) {
-    clog.Log( clog.Debug, "lock for %q \n" , lockName  )
+    clog.Log( clog.Debug, "lock for %+v \n" , lockName  )
 
     if c.cli == nil {
         clog.Log( clog.Err , "CLient has not connect to the server \n" )    
@@ -492,7 +492,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         // create two separate sessions for lock competition
         new_session , err := concurrency.NewSession( c.cli )
         if err != nil {
-            clog.Log( clog.Err , "failed to create session for lock  %q \n" , lockName  )    
+            clog.Log( clog.Err , "failed to create session for lock  %+v \n" , lockName  )    
             clog.Log( clog.Err , "%v \n" , err)
             return 
         }
@@ -502,33 +502,33 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         var ctx context.Context
         if acquire_seconds_timeout>0 {
             ctx, _ = context.WithTimeout(context.Background() , time.Duration(acquire_seconds_timeout) * time.Second )
-            clog.Log( clog.Info , "wait %d seconds for acquire lock=%q \n" , acquire_seconds_timeout ,  lockName  )    
+            clog.Log( clog.Info , "wait %d seconds for acquire lock=%+v \n" , acquire_seconds_timeout ,  lockName  )    
         }else{
             ctx, _ = context.WithCancel(context.Background())
-            clog.Log( clog.Info , "wait  always for acquiring lock=%q \n"  ,  lockName  )    
+            clog.Log( clog.Info , "wait  always for acquiring lock=%+v \n"  ,  lockName  )    
         }
 
         // acquire lock 
-        clog.Log( clog.Debug, "waiting for lock %q  with wait mode \n" , lockName  )
+        clog.Log( clog.Debug, "waiting for lock %+v  with wait mode \n" , lockName  )
         if err := mutex_lock.Lock( ctx ); err != nil {
-            clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
+            clog.Log( clog.Err , "failed to get lock %+v \n" , lockName  )    
             clog.Log( clog.Err , "%v" , err)
             return 
         }
         succeed_flag<-true
-        clog.Log( clog.Debug, "succeeded to lock %q \n" , lockName  )
+        clog.Log( clog.Debug, "succeeded to lock %+v \n" , lockName  )
 
         //wait for unlocking
         <-ch_unlock
-        clog.Log( clog.Debug , "try to unlock %q \n" , lockName  ) 
+        clog.Log( clog.Debug , "try to unlock %+v \n" , lockName  ) 
         defer close(wait_finish_closing)
         
         if err := mutex_lock.Unlock( context.TODO() ); err != nil {
-            clog.Log( clog.Err , "failed to unlock %q \n" , lockName  )    
+            clog.Log( clog.Err , "failed to unlock %+v \n" , lockName  )    
             clog.Log( clog.Err , "%v" , err)
             return
         }
-        clog.Log( clog.Debug , "succeeded to unlock %q \n" , lockName  )        
+        clog.Log( clog.Debug , "succeeded to unlock %+v \n" , lockName  )        
         
     }()
 
@@ -547,7 +547,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
 
 
 func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout int ) ( ch_close , wait_finish_closing chan bool ) {
-    clog.Log( clog.Debug, "Elect for %q with name %q \n" , topic , myName )
+    clog.Log( clog.Debug, "Elect for %+v with name %+v \n" , topic , myName )
 
     if c.cli == nil {
         clog.Log( clog.Err , "CLient has not connect to the server \n" )    
@@ -579,7 +579,7 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
 
         session_new, err := concurrency.NewSession( c.cli )
         if err != nil {
-            clog.Log( clog.Err , "failed to create session for  %q \n" , topic  )    
+            clog.Log( clog.Err , "failed to create session for  %+v \n" , topic  )    
             clog.Log( clog.Err , "%v" , err)
             return
         }
@@ -590,23 +590,23 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
         var ctx context.Context
         if acquire_seconds_timeout>0 {
             ctx, _ = context.WithTimeout(context.Background() , time.Duration(acquire_seconds_timeout) * time.Second )
-            clog.Log( clog.Info , "wait %d seconds for acquiring the leader of topic=%q \n" , acquire_seconds_timeout ,  topic  )    
+            clog.Log( clog.Info , "wait %d seconds for acquiring the leader of topic=%+v \n" , acquire_seconds_timeout ,  topic  )    
         }else{
             ctx, _ = context.WithCancel(context.Background())
-            clog.Log( clog.Info , "wait  always for acquiring the leader of topic=%q \n"  ,  topic  )    
+            clog.Log( clog.Info , "wait  always for acquiring the leader of topic=%+v \n"  ,  topic  )    
         }
 
         if err := elect.Campaign( ctx , myName ); err != nil {
-            clog.Log( clog.Err , "failed to Campaign for  %q \n" , topic  )    
+            clog.Log( clog.Err , "failed to Campaign for  %+v \n" , topic  )    
             clog.Log( clog.Err , "%v" , err)
             return
         }
         succeed_flag<-true
-        clog.Log( clog.Debug, "succeeded to Elect for %q with name %q \n" , topic , myName )
+        clog.Log( clog.Debug, "succeeded to Elect for %+v with name %+v \n" , topic , myName )
 
         //wait for close
         <-ch_close
-        clog.Log( clog.Debug, "receive signal to stop Elect for %q with name %q \n" , topic , myName )
+        clog.Log( clog.Debug, "receive signal to stop Elect for %+v with name %+v \n" , topic , myName )
         defer close(wait_finish_closing )
 
         if err := elect.Resign(context.TODO()); err != nil {
@@ -614,7 +614,7 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
             return 
         }
 
-        clog.Log( clog.Debug, "succeeded to resign the leader of  topic=%q with name %q \n" , topic , myName )
+        clog.Log( clog.Debug, "succeeded to resign the leader of  topic=%+v with name %+v \n" , topic , myName )
 
     }()
 
@@ -630,7 +630,7 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
 
 
 func (c *Client) GetElectLeader( topic string  ) (leader string  , ok bool) {
-    clog.Log( clog.Debug, "GetElectLeader for %q \n" , topic  )
+    clog.Log( clog.Debug, "GetElectLeader for %+v \n" , topic  )
 
     if c.cli == nil {
     	clog.Log( clog.Err , "CLient has not connect to the server \n" )    
@@ -644,7 +644,7 @@ func (c *Client) GetElectLeader( topic string  ) (leader string  , ok bool) {
 
 	session_new, err := concurrency.NewSession( c.cli )
 	if err != nil {
-    	clog.Log( clog.Err , "failed to create session for  %q \n" , topic  )    
+    	clog.Log( clog.Err , "failed to create session for  %+v \n" , topic  )    
         clog.Log( clog.Err , "%v" , err)
     	return "" , false
 	}
@@ -656,17 +656,17 @@ func (c *Client) GetElectLeader( topic string  ) (leader string  , ok bool) {
     if ch := elect.Observe( ctx ) ; ch!=nil {
     	if v , ok := <- ch ; ok {
     		//leader=string(v.Kvs[0].Value)
-		    //clog.Log( clog.Debug, "GetElectLeader found a leader %q for %q \n" , leader , topic  )
+		    //clog.Log( clog.Debug, "GetElectLeader found a leader %+v for %+v \n" , leader , topic  )
 		    for n , v := range v.Kvs {
-		    	clog.Log( clog.Debug, "for topic=%s , leader=%d , GetElectLeader found %d a leader %q  \n" , topic , string(v.Value) ,  n  )
+		    	clog.Log( clog.Debug, "for topic=%s , leader=%d , GetElectLeader found %d a leader %+v  \n" , topic , string(v.Value) ,  n  )
 		    	leader=string(v.Value)
 		    }
     	}else{
-		    clog.Log( clog.Debug, "there is no leader for %q  \n" , topic   )
+		    clog.Log( clog.Debug, "there is no leader for %+v  \n" , topic   )
 		    return "" , true
     	}
     }else{
-		clog.Log( clog.Err, "failed to create Observe for %q \n"  , topic  )
+		clog.Log( clog.Err, "failed to create Observe for %+v \n"  , topic  )
 		return "" , false
     }
 
@@ -695,19 +695,19 @@ func (c *Client) TxnExec( ops []TxnOpStruct ) bool {
 
     kvc :=clientv3.NewKV(c.cli)
 
-    clog.Log( clog.Debug , "ops: %q \n" , ops)    
+    clog.Log( clog.Debug , "ops: %+v \n" , ops)    
 
     ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second )
     result , err := kvc.Txn( ctx ).Then( ops...  ).Commit()  
     cancel()
     if err != nil {
         clog.Log( clog.Err, "txn failed  \n"   )
-        clog.Log( clog.Err, "%q  \n" , err  )
+        clog.Log( clog.Err, "%+v  \n" , err  )
         return false
     }
 
     clog.Log( clog.Info, "txn succeeded  \n"   )
-    clog.Log( clog.Debug, "%q  \n"   , result )
+    clog.Log( clog.Debug, "%+v  \n"   , result )
 
 
     return true
@@ -729,20 +729,20 @@ func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOps []TxnOpStruc
 
     kvc :=clientv3.NewKV(c.cli)
 
-    clog.Log( clog.Debug , "valueCmp: %q \n" , valueCmp)    
-    clog.Log( clog.Debug , "thenOps: %q \n" , thenOps)    
-    clog.Log( clog.Debug , "ElseOps: %q \n" , ElseOps)    
+    clog.Log( clog.Debug , "valueCmp: %+v \n" , valueCmp)    
+    clog.Log( clog.Debug , "thenOps: %+v \n" , thenOps)    
+    clog.Log( clog.Debug , "ElseOps: %+v \n" , ElseOps)    
 
     ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second )
     result , err := kvc.Txn( ctx ).If( valueCmp... ).Then( thenOps...  ).Else( ElseOps...).Commit()  
     cancel()
     if err != nil {
         clog.Log( clog.Err, "txn failed  \n"   )
-        clog.Log( clog.Err, "%q  \n" , err  )
+        clog.Log( clog.Err, "%+v  \n" , err  )
         return false , false
     }
 
-    clog.Log( clog.Debug, "%q  \n"   , result )
+    clog.Log( clog.Debug, "%+v  \n"   , result )
     if result.Succeeded {
         clog.Log( clog.Info, "if is ok , execute then commands  \n"   , result )
         return true, true 

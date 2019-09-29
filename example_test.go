@@ -161,11 +161,11 @@ func Test_lease(t *testing.T){
 		fmt.Println("failed to PutWithLease ")
 		t.FailNow()			
 	}else{
-		fmt.Printf( "succeeded to PutWithLease id=%q " , lease_id )
+		fmt.Printf( "succeeded to PutWithLease id=%+v " , lease_id )
 
 	    go func(){
 	    	for v  := range ch {
-	    			log.Log( log.Info , "sent a keepalive , message =%q  \n" , v )    
+	    			log.Log( log.Info , "sent a keepalive , message =%+v  \n" , v )    
 	    	}
 	    	log.Log( log.Err , "keepalived was interrupted\n"  )    
 	    }()
@@ -213,7 +213,7 @@ func Test_watch(t *testing.T){
 	        	break
 	        }
 	        for n, ev := range wresp.Events {
-	            fmt.Printf(" evnet %d : %s %q : %q\n", n , ev.Type, ev.Kv.Key, ev.Kv.Value)
+	            fmt.Printf(" evnet %d : %s %+v : %+v\n", n , ev.Type, ev.Kv.Key, ev.Kv.Value)
 	            //
 	        }
 	        //stop watch
@@ -241,7 +241,7 @@ func watchCallBacker(evnet etcd.EventWatch , key string, newVal string , oldVal 
 	}else if evnet == etcd.EventDelete {
 		log.Log( log.Info , "got delete event  %s \n" , key  ) 
 	}else{
-		log.Log( log.Err , "got unknown event  type=%q \n" , evnet )
+		log.Log( log.Err , "got unknown event  type=%+v \n" , evnet )
 	}
 }
 
