@@ -463,25 +463,27 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) bool {
 //=====================================================
 
 
-func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_unlock chan bool) {
+func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_unlock  , wait_finish_closing chan bool ,  ) {
     clog.Log( clog.Debug, "lock for %q \n" , lockName  )
 
     if c.cli == nil {
         clog.Log( clog.Err , "CLient has not connect to the server \n" )    
-        return nil
+        return nil , nil 
     }
 
     if len(lockName) == 0 {
         clog.Log( clog.Err , "miss lockName \n" )    
-        return nil      
+        return nil  , nil     
     }
     if acquire_seconds_timeout<0 {
         clog.Log( clog.Err , "erro acquire_seconds_timeout=%d \n" , acquire_seconds_timeout )    
-        return nil   
+        return nil   , nil 
     }
 
     succeed_flag:=make(chan bool)
     ch_unlock=make(chan bool)
+    wait_finish_closing=make(chan bool)
+
     go func(){
         defer func(){
             succeed_flag<-false
@@ -492,7 +494,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         if err != nil {
             clog.Log( clog.Err , "failed to create session for lock  %q \n" , lockName  )    
             clog.Log( clog.Err , "%v \n" , err)
-            return
+            return 
         }
         defer new_session.Close()
         mutex_lock := concurrency.NewMutex( new_session , lockName )
@@ -511,7 +513,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         if err := mutex_lock.Lock( ctx ); err != nil {
             clog.Log( clog.Err , "failed to get lock %q \n" , lockName  )    
             clog.Log( clog.Err , "%v" , err)
-            return
+            return 
         }
         succeed_flag<-true
         clog.Log( clog.Debug, "succeeded to lock %q \n" , lockName  )
@@ -519,6 +521,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         //wait for unlocking
         <-ch_unlock
         clog.Log( clog.Debug , "try to unlock %q \n" , lockName  ) 
+        defer close(wait_finish_closing)
         
         if err := mutex_lock.Unlock( context.TODO() ); err != nil {
             clog.Log( clog.Err , "failed to unlock %q \n" , lockName  )    
@@ -526,14 +529,15 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
             return
         }
         clog.Log( clog.Debug , "succeeded to unlock %q \n" , lockName  )        
+        
     }()
 
     if val , ok := <-succeed_flag ; !ok || !val {
         clog.Log( clog.Err , "failed to lock %s \n" , lockName )
-        return nil
+        return nil , nil 
     }    
 
-    return ch_unlock
+    return ch_unlock , wait_finish_closing
 }
 
 
@@ -542,30 +546,32 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
 //=====================================================
 
 
-func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout int ) ( ch_close chan bool ) {
+func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout int ) ( ch_close , wait_finish_closing chan bool ) {
     clog.Log( clog.Debug, "Elect for %q with name %q \n" , topic , myName )
 
     if c.cli == nil {
         clog.Log( clog.Err , "CLient has not connect to the server \n" )    
-        return nil
+        return nil , nil
     }
 
     if len(topic) == 0 {
         clog.Log( clog.Err , "miss topic \n" )    
-        return nil      
+        return nil      , nil
     }
     if len(myName) == 0 {
         clog.Log( clog.Err , "miss myName \n" )    
-        return nil      
+        return nil     , nil 
     }
     if acquire_seconds_timeout<0 {
         clog.Log( clog.Err , "erro acquire_seconds_timeout=%d \n" , acquire_seconds_timeout )    
-        return nil   
+        return nil   , nil
     }
 
 
     succeed_flag:=make(chan bool)
     ch_close=make(chan bool)
+    wait_finish_closing=make(chan bool)
+
     go func(){
         defer func(){
             succeed_flag<-false
@@ -601,21 +607,23 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
         //wait for close
         <-ch_close
         clog.Log( clog.Debug, "receive signal to stop Elect for %q with name %q \n" , topic , myName )
-        
+        defer close(wait_finish_closing )
+
         if err := elect.Resign(context.TODO()); err != nil {
             clog.Log( clog.Err , "%v" , err)
             return 
         }
 
         clog.Log( clog.Debug, "succeeded to resign the leader of  topic=%q with name %q \n" , topic , myName )
+
     }()
 
     if val , ok := <-succeed_flag ; !ok || !val {
         clog.Log( clog.Err , "failed to compain" )
-        return nil
+        return nil, nil
     }
     
-    return ch_close
+    return ch_close , wait_finish_closing
 }
 
 

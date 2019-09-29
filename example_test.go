@@ -312,7 +312,7 @@ func Test_lock(t *testing.T){
 
 
 	//ch_close:=c.TryLock("ccc" , 3  )
-	ch_close:=c.TryLock("ccc" , 0  )
+	ch_close , wait_finish_closing  :=c.TryLock("ccc" , 0  )
 	if ch_close==nil {
 		fmt.Println(  "failed to lock" )
 		t.FailNow()
@@ -331,6 +331,8 @@ func Test_lock(t *testing.T){
 	time.Sleep(10*time.Second)
 
 	close(ch_close)
+	<-wait_finish_closing
+
 	time.Sleep(10*time.Second)
 
 }
@@ -385,7 +387,7 @@ func Test_try_elect(t *testing.T){
 	topic:="mytopic"
 
 	//sh_close:=c.ElectLeader( topic  , "host_test" , 2 )
-	sh_close:=c.ElectLeader( topic  , "host_test" , 0 )
+	sh_close , wait_finish_closing :=c.ElectLeader( topic  , "host_test" , 0 )
 
 	if sh_close==nil {
 		fmt.Println(  "failed to elect for " , topic )
@@ -405,6 +407,7 @@ func Test_try_elect(t *testing.T){
 
 
 	close(sh_close)
+	<-wait_finish_closing
 	time.Sleep(10*time.Second)
 
 
