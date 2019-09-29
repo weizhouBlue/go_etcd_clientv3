@@ -474,7 +474,9 @@ func Test_txn_compare (t *testing.T){
 
 	cmplist  := []etcd.TxnCmpStruct {
 		etcd.TxnCompare(etcd.Value("v1"), "=", "100") ,
-		etcd.TxnCompare(etcd.Value("v2"), "=", "110") ,
+		etcd.TxnCompare(etcd.Value("v2"), "!=", "111") ,
+		etcd.TxnCompare(etcd.Value("v2"), ">", "100") ,
+		etcd.TxnCompare(etcd.Value("v2"), "<", "200") ,
 
 	}
 	thenlist :=[]etcd.TxnOpStruct {
