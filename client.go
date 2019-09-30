@@ -220,6 +220,42 @@ func (c *Client) Get( key string) (string , bool) {
 
 
 
+func (c *Client) GetListKey( keyList []string) ( map[string] string , bool) {
+    clog.Log(clog.Debug, "get etcd  keyList=%+v \n" , keyList  )
+
+    if c.cli == nil {
+        clog.Log( clog.Err , "CLient has not connect to the server \n" )    
+        return nil , false
+    }
+
+    if len(keyList)==0 {
+        clog.Log( clog.Err , "error, keyList is empty \n" )    
+        return nil , false 
+    }
+    for _ , v := range keyList {
+        if len(v)==0 {
+            clog.Log( clog.Err , "error, there is an empty key inputted \n" )    
+            return nil , false 
+        }
+    }
+
+    reList:= map[string]string {}
+
+    for _ , v := range keyList {
+        if result , ok := c.Get(v) ; !ok {
+            clog.Log( clog.Err , "error, failed to get key=%s  \n" , v )    
+            return nil , false
+        }else{
+            reList[v]=result
+        }
+    }
+    return reList , true
+
+}
+
+
+
+
 func (c *Client) GetPrefix( prefix string) ( map[string]string  , bool ) {
     clog.Log( clog.Debug, "GetPrefix etcd  prefix=%s \n" , prefix  )
 
@@ -522,7 +558,7 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         <-ch_unlock
         clog.Log( clog.Debug , "try to unlock %+v \n" , lockName  ) 
         defer close(wait_finish_closing)
-        
+
         if err := mutex_lock.Unlock( context.TODO() ); err != nil {
             clog.Log( clog.Err , "failed to unlock %+v \n" , lockName  )    
             clog.Log( clog.Err , "%v" , err)

@@ -92,6 +92,15 @@ func Test_basic(t *testing.T){
 	}
 
 
+	if v , ok:= c.GetListKey( []string{"/a1" , "/a2" , "/a3" }  ) ; ok {
+			fmt.Printf("succeeded to GetListKey = %+v \n" , v )
+	}else{
+		fmt.Println("failed to GetListKey ")
+		t.FailNow()			
+	}
+
+
+
 
 	if ! c.Put("/a1" , "100") {
 		fmt.Println("failed to put etcd")
