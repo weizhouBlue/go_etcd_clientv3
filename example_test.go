@@ -20,7 +20,7 @@ func Test_instance_config(t *testing.T){
 		Tls_key : "./test-tls-cert/etcd-key" ,
 	}
 
-	if ! c.Connect( []string {"https://10.6.185.150:12379" } ) {
+	if err:= c.Connect( []string {"https://10.6.185.150:12379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -39,7 +39,7 @@ func Test_GloablConfig(t *testing.T){
 	etcd.Global_endpoints=[]string {"https://10.6.185.150:12379" }
 
 	c:= etcd.Client{}
-	if ! c.Connect( nil ) {
+	if err:= c.Connect( nil ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -55,10 +55,10 @@ func Test_basic(t *testing.T){
 	log.Config(  log.Debug , " test module" , "" )  
 
 	var c etcd.Client
-	var ok bool
+	var err error
 	var val string
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil  {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -67,8 +67,8 @@ func Test_basic(t *testing.T){
 
 
 
-	val , ok = c.Get("/a20" )
-	if !ok {
+	val , err = c.Get("/a20" )
+	if err!=nil  {
 		fmt.Println("failed to get ")
 		t.FailNow()		
 	}
@@ -80,7 +80,7 @@ func Test_basic(t *testing.T){
 
 
 
-	if v , ok:= c.GetPrefix("/bbbb") ; ok {
+	if v , err := c.GetPrefix("/bbbb") ; err!=nil {
 		if v==nil {
 			fmt.Printf("prefix is empty  \n" )
 		}else{
@@ -92,7 +92,7 @@ func Test_basic(t *testing.T){
 	}
 
 
-	if v , ok:= c.GetListKey( []string{"/a1" , "/a2" , "/a3" }  ) ; ok {
+	if v , err := c.GetListKey( []string{"/a1" , "/a2" , "/a3" }  ) ; err==nil {
 			fmt.Printf("succeeded to GetListKey = %+v \n" , v )
 	}else{
 		fmt.Println("failed to GetListKey ")
@@ -102,11 +102,11 @@ func Test_basic(t *testing.T){
 
 
 
-	if ! c.Put("/a1" , "100") {
+	if  c.Put("/a1" , "100") != nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
-	if ! c.Put("/a2" , "200") {
+	if  c.Put("/a2" , "200") != nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
@@ -114,8 +114,8 @@ func Test_basic(t *testing.T){
 
 
 
-	val , ok = c.Get("/a1" )
-	if !ok {
+	val , err = c.Get("/a1" )
+	if err!=nil {
 		fmt.Println("failed to get ")
 		t.FailNow()		
 	}
@@ -127,7 +127,7 @@ func Test_basic(t *testing.T){
 
 
 
-	if v , ok:= c.GetPrefix("/a") ; ok {
+	if v , err := c.GetPrefix("/a") ; err==nil {
 		if v==nil {
 			fmt.Printf("prefix is empty  \n" )
 		}else{
@@ -140,7 +140,7 @@ func Test_basic(t *testing.T){
 
 
 
-	if  c.Delete("/a10" , false ) {
+	if  err:=c.Delete("/a10" , false ) ; err==nil {
 		fmt.Printf("succeeded to delete a10 \n" )
 	}else{
 		fmt.Println("failed to delete ")
@@ -159,21 +159,21 @@ func Test_lease(t *testing.T){
 	var c etcd.Client
 
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ); err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 
-	if ch , lease_id , ch_delete := c.PutWithLease( map[string]string{"la":"200" , "lb":"201"} , 5 ) ; ch==nil{
+	if  ch_delete , info , err := c.PutWithLease( map[string]string{"la":"200" , "lb":"201"} , 5 ) ; err !=nil{
 		fmt.Println("failed to PutWithLease ")
 		t.FailNow()			
 	}else{
-		fmt.Printf( "succeeded to PutWithLease id=%+v " , lease_id )
+		fmt.Printf( "succeeded to PutWithLease id=%+v " , info.Lease_id )
 
 	    go func(){
-	    	for v  := range ch {
+	    	for v  := range info.Ch_alive_status {
 	    			log.Log( log.Info , "sent a keepalive , message =%+v  \n" , v )    
 	    	}
 	    	log.Log( log.Err , "keepalived was interrupted\n"  )    
@@ -199,7 +199,7 @@ func Test_watch(t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -260,7 +260,7 @@ func Test_watch2(t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -268,29 +268,29 @@ func Test_watch2(t *testing.T){
 	defer c.Close()
 
 
-	ch_close_watch:=c.WatchByHandler( "/a1" , true , watchCallBacker )
-	if ch_close_watch==nil{
+	ch_close_watch , err :=c.WatchByHandler( "/a1" , true , watchCallBacker )
+	if err!=nil{
 		fmt.Println(  "failed to watch" )
 		t.FailNow()		
 	}
 
 	time.Sleep(1*time.Second)
 
-	if ! c.Put("/a1" , "100") {
+	if  c.Put("/a1" , "100") != nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
 	time.Sleep(5*time.Second)
 
 
-	if ! c.Put("/a1" , "110") {
+	if  c.Put("/a1" , "110")!= nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
 	time.Sleep(5*time.Second)
 
 
-	if ! c.Delete("/a1" , false ) {
+	if err:= c.Delete("/a1" , false ) ; err!=nil{
 		fmt.Println("failed to delete ")
 		t.FailNow()			
 	}
@@ -312,7 +312,7 @@ func Test_lock(t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -321,8 +321,8 @@ func Test_lock(t *testing.T){
 
 
 	//ch_close:=c.TryLock("ccc" , 3  )
-	ch_close , wait_finish_closing  :=c.TryLock("ccc" , 0  )
-	if ch_close==nil {
+	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 0  )
+	if err!=nil {
 		fmt.Println(  "failed to lock" )
 		t.FailNow()
 	}
@@ -330,7 +330,7 @@ func Test_lock(t *testing.T){
 	fmt.Println(  "get lock" )
 
 
-	if ! c.Put("/a1" , "110") {
+	if c.Put("/a1" , "110")!= nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
@@ -355,7 +355,7 @@ func Test_elect_get(t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:=c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -366,8 +366,8 @@ func Test_elect_get(t *testing.T){
 
 
 
-	leader , ok:= c.GetElectLeader( topic  )
-	if !ok {
+	leader , err := c.GetElectLeader( topic  )
+	if err!=nil {
 		fmt.Println(  "failed to get the leader" )
 		t.FailNow()
 	}
@@ -386,7 +386,7 @@ func Test_try_elect(t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -396,9 +396,9 @@ func Test_try_elect(t *testing.T){
 	topic:="mytopic"
 
 	//sh_close:=c.ElectLeader( topic  , "host_test" , 2 )
-	sh_close , wait_finish_closing :=c.ElectLeader( topic  , "host_test" , 0 )
+	sh_close , wait_finish_closing , err :=c.ElectLeader( topic  , "host_test" , 0 )
 
-	if sh_close==nil {
+	if err!=nil {
 		fmt.Println(  "failed to elect for " , topic )
 		t.FailNow()		
 	}
@@ -406,8 +406,8 @@ func Test_try_elect(t *testing.T){
 
 	time.Sleep(20*time.Second)
 
-	leader , ok:= c.GetElectLeader( topic  )
-	if !ok {
+	leader , err := c.GetElectLeader( topic  )
+	if err!=nil {
 		fmt.Println(  "failed to get the leader" )
 		t.FailNow()
 	}
@@ -430,7 +430,7 @@ func Test_txn_exec (t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -439,13 +439,13 @@ func Test_txn_exec (t *testing.T){
 
 
 	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
-	ok := c.TxnExec( []etcd.TxnOpStruct {
+	err := c.TxnExec( []etcd.TxnOpStruct {
 				etcd.TxnOpPut("v1" , "110") ,
 				etcd.TxnOpPut("v2" , "120") ,
 				etcd.TxnOpGet("v4" ) ,
 				etcd.TxnOpDelete("v3" ) ,
 			})
-	if !ok {
+	if err==nil {
 		fmt.Println(  "failed to Test_txn_exec " )		
 		t.FailNow()
 	}
@@ -464,7 +464,7 @@ func Test_txn_compare (t *testing.T){
 
 	var c etcd.Client
 
-	if ! c.Connect( []string {"http://127.0.0.1:2379" } ) {
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ); err!=nil  {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -472,11 +472,11 @@ func Test_txn_compare (t *testing.T){
 	defer c.Close()
 
 
-	if ! c.Put("v1" , "100") {
+	if  c.Put("v1" , "100")!= nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
-	if ! c.Put("v2" , "110") {
+	if  c.Put("v2" , "110") != nil {
 		fmt.Println("failed to put etcd")
 		t.FailNow()		
 	}
@@ -497,10 +497,10 @@ func Test_txn_compare (t *testing.T){
 	elselist:=[]etcd.TxnOpStruct {
 				etcd.TxnOpPut("flag" , "false") ,
 			}
-	result, ok := c.TxnExecCmpValue(  cmplist , thenlist , elselist )
+	thenTrue, err := c.TxnExecCmpValue(  cmplist , thenlist , elselist )
 	//c.TxnExecCmpValue(  cmplist , thenlist , nil )
-	if ok {
-		if result {
+	if err==nil {
+		if thenTrue {
 			fmt.Println(  "execute then list " )		
 		}else{
 			fmt.Println(  "execute else list " )		
