@@ -15,7 +15,6 @@ import (
     "crypto/tls"
     "strings"
     "fmt"
-    clog "github.com/weizhouBlue/go_log"
 
 )
 
@@ -78,9 +77,6 @@ func (c *Client) Connect( endpoints []string  )  error {
     var etcd_ca string
     var etcd_key string
     var etcd_cert string
-
-    clog.Config(  clog.Debug , "manager httpserver" , "" ) 
-
 
 	if len(endpoints) ==0 && len(Global_endpoints)==0  {
 		return   fmt.Errorf("inputted etcd server is empty")
@@ -439,7 +435,7 @@ func (c *Client) PutWithLease( keyMap map[string]string , ttl int64 ) ( ch_delet
     	log( "receive signal to delete lease id=%+v \n" , resp.ID )
     	keep_cancel()
     	if err:= c.deleteLease(resp.ID) ; err!=nil {
-    		clog.Log(clog.Err, "failed to delete lease id=%+v \n" , resp.ID )
+    		log( "failed to delete lease id=%+v \n" , resp.ID )
             return 
     	}
     	log( "succeeded to delete lease id=%+v \n" , resp.ID )
@@ -510,10 +506,10 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         var ctx context.Context
         if acquire_seconds_timeout>0 {
             ctx, _ = context.WithTimeout(context.Background() , time.Duration(acquire_seconds_timeout) * time.Second )
-            clog.Log( clog.Info , "wait %d seconds for acquire lock=%+v \n" , acquire_seconds_timeout ,  lockName  )    
+            log( "wait %d seconds for acquire lock=%+v \n" , acquire_seconds_timeout ,  lockName  )    
         }else{
             ctx, _ = context.WithCancel(context.Background())
-            clog.Log( clog.Info , "wait  always for acquiring lock=%+v \n"  ,  lockName  )    
+            log("wait  always for acquiring lock=%+v \n"  ,  lockName  )    
         }
 
         // acquire lock 
@@ -593,10 +589,10 @@ func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout i
         var ctx context.Context
         if acquire_seconds_timeout>0 {
             ctx, _ = context.WithTimeout(context.Background() , time.Duration(acquire_seconds_timeout) * time.Second )
-            clog.Log( clog.Info , "wait %d seconds for acquiring the leader of topic=%+v \n" , acquire_seconds_timeout ,  topic  )    
+            log( "wait %d seconds for acquiring the leader of topic=%+v \n" , acquire_seconds_timeout ,  topic  )    
         }else{
             ctx, _ = context.WithCancel(context.Background())
-            clog.Log( clog.Info , "wait  always for acquiring the leader of topic=%+v \n"  ,  topic  )    
+            log( "wait  always for acquiring the leader of topic=%+v \n"  ,  topic  )    
         }
 
         if err := elect.Campaign( ctx , myName ); err != nil {
