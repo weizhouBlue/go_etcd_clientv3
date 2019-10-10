@@ -686,7 +686,7 @@ func convertOpSlice( OpsList []interface{} ) ( []TxnOpStruct , error ) {
 
 
     if OpsList==nil {
-        return nil , nil 
+        return []TxnOpStruct {} , nil 
     }
 
     allKey:=[]string{}
