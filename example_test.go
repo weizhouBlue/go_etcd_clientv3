@@ -439,14 +439,13 @@ func Test_txn_exec (t *testing.T){
 
 
 	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
-	err := c.TxnExec( []etcd.TxnOpStruct {
-				etcd.TxnOpPut("v1" , "110") ,
-				etcd.TxnOpPut("v2" , "120") ,
-				etcd.TxnOpGet("v4" ) ,
-				etcd.TxnOpDelete("v3" ) ,
-			})
-	if err==nil {
-		fmt.Println(  "failed to Test_txn_exec " )		
+	err := c.TxnExec( []interface{} {
+		[]interface{}{ etcd.TxnOpPut , "v1" , "110" },
+		[]interface{}{ etcd.TxnOpDelete , "v2" },
+
+	})
+	if err!=nil {
+		fmt.Printf(  "failed to Test_txn_exec , %v" , err )		
 		t.FailNow()
 	}
 
@@ -481,22 +480,31 @@ func Test_txn_compare (t *testing.T){
 		t.FailNow()		
 	}
 
+	
 
-	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
 
+
+
+	//只要有一个compare是失败的，就执行else，否则执行then
 	cmplist  := []etcd.TxnCmpStruct {
 		etcd.TxnCompare(etcd.Value("v1"), "=", "100") ,
 		etcd.TxnCompare(etcd.Value("v2"), "!=", "111") ,
 		etcd.TxnCompare(etcd.Value("v2"), ">", "100") ,
 		etcd.TxnCompare(etcd.Value("v2"), "<", "200") ,
-
 	}
-	thenlist :=[]etcd.TxnOpStruct {
-				etcd.TxnOpPut("flag" , "true") ,
-			}
-	elselist:=[]etcd.TxnOpStruct {
-				etcd.TxnOpPut("flag" , "false") ,
-			}
+	// 注意：不能多个op 对同一个 key 做操作 	
+	thenlist := []interface{}{
+		[]interface{}{ etcd.TxnOpPut , "flag1" , "100"},
+		[]interface{}{ etcd.TxnOpDelete , "flag2" },
+	}
+
+	//can do nothing
+	elselist:=[]interface{}{}
+	// elselist:= []interface{}{
+	// 	[]interface{}{ etcd.TxnOpPut , "flag1" , "100"},
+	// 	[]interface{}{ etcd.TxnOpDelete , "flag2" },
+	// }
+
 	thenTrue, err := c.TxnExecCmpValue(  cmplist , thenlist , elselist )
 	//c.TxnExecCmpValue(  cmplist , thenlist , nil )
 	if err==nil {
@@ -514,6 +522,7 @@ func Test_txn_compare (t *testing.T){
 
 
 	time.Sleep(10*time.Second)
+
 
 
 }

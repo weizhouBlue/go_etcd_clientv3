@@ -15,7 +15,7 @@ import (
     "crypto/tls"
     "strings"
     "fmt"
-
+    "reflect"
 )
 
 
@@ -675,51 +675,125 @@ var (
 )
 
 type TxnOpStruct = clientv3.Op
+type TxnCmpStruct = clientv3.Cmp
 
-func (c *Client) TxnExec( ops []TxnOpStruct ) error  {
 
-    if c.cli == nil {
-        return  fmt.Errorf( "CLient has not connected to the server" )
+
+//check avaliability of op keys
+//key不能为空
+//所有op的key不能重复 
+func convertOpSlice( OpsList []interface{} ) ( []TxnOpStruct , error ) {
+
+
+    if OpsList==nil {
+        return nil , nil 
     }
 
-    kvc :=clientv3.NewKV(c.cli)
+    allKey:=[]string{}
+    result := []TxnOpStruct {}
 
-    log( "ops: %+v \n" , ops)    
 
-    ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second )
-    result , err := kvc.Txn( ctx ).Then( ops...  ).Commit()  
-    cancel()
-    if err != nil {
-        return err 
+    for _, item_list := range OpsList {
+        if op_list , ok := item_list.( []interface{} ) ; ok {
+
+            switch op_list[0].(type){
+            case func( string, string,  ...clientv3.OpOption ) clientv3.Op :
+                fun , _ := op_list[0].(func( string, string,  ...clientv3.OpOption )clientv3.Op  )
+                if reflect.ValueOf(fun).Pointer()  ==  reflect.ValueOf(TxnOpPut).Pointer()  {
+                    log("put op")
+                    if len(op_list)!=3{
+                        return nil , fmt.Errorf("error, wrong number of variable for put op"  )
+                    }
+                    value , value_ok := op_list[2].(string)
+                    if  value_ok==false {
+                        return nil , fmt.Errorf("error, wrong var type of the value of put op , %T \n ", op_list[1] )
+                    }
+
+                    key , key_ok := op_list[1].(string)
+                    if  key_ok==false {
+                        return nil , fmt.Errorf("error, wrong var type of the key of put op , %T \n ", op_list[1] )
+                    }else{
+                        if len(key)==0{
+                            return nil , fmt.Errorf("error, empty string for the key of put op , %T \n ", op_list[1] )
+                        }else{
+                            for _ , y := range allKey {
+                                if y==key {
+                                    return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
+                                }
+                            }
+                            allKey=append(allKey , key )
+                            result=append( result, TxnOpPut( key , value ) )
+                        }
+                    }
+                    
+                }else{
+                    return nil , fmt.Errorf("error, unsupported op  ")
+                }
+            case func( string,  ...clientv3.OpOption )clientv3.Op :
+                fun , _ := op_list[0].(func( string ,  ...clientv3.OpOption )clientv3.Op )
+                if reflect.ValueOf(fun).Pointer()  ==  reflect.ValueOf( TxnOpDelete ).Pointer()  {
+                    log("delete op")
+                    if len(op_list)!=2 {
+                        return nil , fmt.Errorf("error, wrong number of variable for delete op")
+                    }
+                    key , key_ok := op_list[1].(string)
+                    if  key_ok==false {
+                        return nil , fmt.Errorf("error, wrong var type of the key of put op , %T \n ", op_list[1] )
+                    }else{
+                        if len(key)==0{
+                            return nil , fmt.Errorf("error, empty string for the key of delete op , %T \n ", op_list[1] )
+                        }else{
+                            for _ , y := range allKey {
+                                if y==key {
+                                    return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
+                                }
+                            }                            
+                            allKey=append(allKey , key )
+                            result=append( result ,TxnOpDelete( key ) )
+                        }
+                    }
+
+                }else{
+                    return nil , fmt.Errorf("error, unsupported op")
+                }
+
+            default:
+                fmt.Printf("error item list  , %T \n" , op_list[0] )
+            } 
+
+        }else{
+            return nil , fmt.Errorf("error item , %v \n" , op_list)    
+        }
     }
+    return  result , nil 
 
-    log( "txn succeeded  \n"   )
-    log( "%+v  \n"   , result )
-
-    return nil
 }
 
 
 
-
-
-type TxnCmpStruct = clientv3.Cmp
-
-
-func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOps []TxnOpStruct  , ElseOps []TxnOpStruct ) ( ifIsTrue bool , er error ) {
+func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOpsList []interface{}  , elseOpsList []interface{} ) ( ifIsTrue bool , er error ) {
 
     if c.cli == nil {
         return  false , fmt.Errorf( "CLient has not connected to the server" )
     }
 
+    thenOpsRe , erra :=convertOpSlice( thenOpsList )
+    if erra!=nil{
+        return false , erra
+    }
+    elseOpsRe , errb :=convertOpSlice( elseOpsList )
+    if errb !=nil{
+        return false , errb 
+    }
+
     kvc :=clientv3.NewKV(c.cli)
 
     log( "valueCmp: %+v \n" , valueCmp)    
-    log( "thenOps: %+v \n" , thenOps)    
-    log( "ElseOps: %+v \n" , ElseOps)    
+    log( "thenOps: %+v \n" , thenOpsRe)    
+    log( "ElseOps: %+v \n" , elseOpsRe)    
 
     ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second )
-    result , err := kvc.Txn( ctx ).If( valueCmp... ).Then( thenOps...  ).Else( ElseOps...).Commit()  
+    result , err := kvc.Txn( ctx ).If( valueCmp... ).Then( thenOpsRe...  ).Else( elseOpsRe...).Commit()  
     cancel()
     if err != nil {
         return false , err
@@ -739,6 +813,36 @@ func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOps []TxnOpStruc
 
 
 
+func (c *Client) TxnExec( ops []interface{} ) error  {
+
+    if c.cli == nil {
+        return  fmt.Errorf( "CLient has not connected to the server" )
+    }
+    if ops == nil || len(ops)==0  {
+        return  fmt.Errorf( "no inputted op" )
+    }
+    thenOpsRe , erra :=convertOpSlice( ops )
+    if erra!=nil{
+        return  erra
+    }
+
+
+    kvc :=clientv3.NewKV(c.cli)
+
+    log( "ops: %+v \n" , thenOpsRe)    
+
+    ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Second )
+    result , err := kvc.Txn( ctx ).Then( thenOpsRe...  ).Commit()  
+    cancel()
+    if err != nil {
+        return err 
+    }
+
+    log( "txn succeeded  \n"   )
+    log( "%+v  \n"   , result )
+
+    return nil
+}
 
 //=====================================================
 
