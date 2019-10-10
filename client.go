@@ -15,7 +15,6 @@ import (
     "crypto/tls"
     "strings"
     "fmt"
-    "reflect"
 )
 
 
@@ -325,7 +324,8 @@ func (c *Client) Delete( key string , prefixFlag bool  ) error {
 //=====================================================
 
 
-func (c *Client) WatchByHandler( key string , prefixFlag bool ,	caller func(evnet EventWatch , key , newVal , oldVal string ) )  (ch_stop chan bool , err error ){
+
+func (c *Client) WatchByHandler( key string , prefixFlag , ignoreDeleteEvent , ignorePutEvent bool , caller func(evnet EventWatch , key , newVal , oldVal string ) )  (ch_stop chan bool , err error ){
     log( "Watch etcd  key=%s \n" , key  )
 
     if c.cli == nil {
@@ -336,15 +336,21 @@ func (c *Client) WatchByHandler( key string , prefixFlag bool ,	caller func(evne
         return nil , fmt.Errorf( "error, key is empty " ) 
     }
 
-    var eventChan clientv3.WatchChan
+    opList:=[]clientv3.OpOption{}
     if prefixFlag {
-    	eventChan = c.cli.Watch(context.Background(), key , clientv3.WithPrefix())
-    }else{
-    	eventChan = c.cli.Watch( context.Background() , key )
+        opList=append(opList , clientv3.WithPrefix() )
+    }
+    if ignoreDeleteEvent {
+        opList=append(opList , clientv3.WithFilterDelete() )
+    }
+    if ignorePutEvent {
+        opList=append(opList , clientv3.WithFilterPut() )
     }
 
-    ch_stop = make(chan bool)
+    var eventChan clientv3.WatchChan
+    eventChan = c.cli.Watch(context.Background(), key , opList... )
 
+    ch_stop = make(chan bool)
     go func(c *Client){
     	for{
     		select {
@@ -666,15 +672,22 @@ func (c *Client) GetElectLeader( topic string  ) (leader string  , er error ) {
 }
 
 //=====================================================
+
 var (
-  TxnOpPut = clientv3.OpPut
-  TxnOpGet = clientv3.OpGet
-  TxnOpDelete = clientv3.OpDelete
-  TxnCompare = clientv3.Compare
-  Value = clientv3.Value
+    TxnPutKey="TxnPutKey"
+    TxnDelKey="TxnDelKey"
+    TxnDelKeyWithPrefix="TxnDelKeyWithPrefix"
 )
 
-type TxnOpStruct = clientv3.Op
+var (
+  // TxnOpPut = clientv3.OpPut
+  // TxnOpGet = clientv3.OpGet
+  // TxnOpDelete = clientv3.OpDelete
+  TxnCompare = clientv3.Compare
+  TxnValue = clientv3.Value
+)
+
+
 type TxnCmpStruct = clientv3.Cmp
 
 
@@ -682,87 +695,68 @@ type TxnCmpStruct = clientv3.Cmp
 //check avaliability of op keys
 //key不能为空
 //所有op的key不能重复 
-func convertOpSlice( OpsList []interface{} ) ( []TxnOpStruct , error ) {
-
+func convertOpSlice( OpsList []interface{} ) ( []clientv3.Op , error ) {
 
     if OpsList==nil {
-        return []TxnOpStruct {} , nil 
+        return []clientv3.Op {} , nil 
     }
 
     allKey:=[]string{}
-    result := []TxnOpStruct {}
+    result := []clientv3.Op {}
 
 
     for _, item_list := range OpsList {
-        if op_list , ok := item_list.( []interface{} ) ; ok {
-
-            switch op_list[0].(type){
-            case func( string, string,  ...clientv3.OpOption ) clientv3.Op :
-                fun , _ := op_list[0].(func( string, string,  ...clientv3.OpOption )clientv3.Op  )
-                if reflect.ValueOf(fun).Pointer()  ==  reflect.ValueOf(TxnOpPut).Pointer()  {
+        if op_list , ok := item_list.( []string ) ; ok {
+             
+            switch op_list[0] {
+            case TxnPutKey :
                     log("put op")
                     if len(op_list)!=3{
                         return nil , fmt.Errorf("error, wrong number of variable for put op"  )
                     }
-                    value , value_ok := op_list[2].(string)
-                    if  value_ok==false {
-                        return nil , fmt.Errorf("error, wrong var type of the value of put op , %T \n ", op_list[1] )
-                    }
-
-                    key , key_ok := op_list[1].(string)
-                    if  key_ok==false {
-                        return nil , fmt.Errorf("error, wrong var type of the key of put op , %T \n ", op_list[1] )
+                    key:=op_list[1]
+                    value:=op_list[2]
+                    if len(key)==0{
+                        return nil , fmt.Errorf("error, empty string for the key of put op , %T \n ", op_list[1] )
                     }else{
-                        if len(key)==0{
-                            return nil , fmt.Errorf("error, empty string for the key of put op , %T \n ", op_list[1] )
-                        }else{
-                            for _ , y := range allKey {
-                                if y==key {
-                                    return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
-                                }
+                        for _ , y := range allKey {
+                            if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                                return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
                             }
-                            allKey=append(allKey , key )
-                            result=append( result, TxnOpPut( key , value ) )
                         }
+                        allKey=append(allKey , key )
+                        result=append( result, clientv3.OpPut( key , value ) )
                     }
                     
-                }else{
-                    return nil , fmt.Errorf("error, unsupported op  ")
-                }
-            case func( string,  ...clientv3.OpOption )clientv3.Op :
-                fun , _ := op_list[0].(func( string ,  ...clientv3.OpOption )clientv3.Op )
-                if reflect.ValueOf(fun).Pointer()  ==  reflect.ValueOf( TxnOpDelete ).Pointer()  {
+
+            case TxnDelKey , TxnDelKeyWithPrefix :
                     log("delete op")
                     if len(op_list)!=2 {
                         return nil , fmt.Errorf("error, wrong number of variable for delete op")
                     }
-                    key , key_ok := op_list[1].(string)
-                    if  key_ok==false {
-                        return nil , fmt.Errorf("error, wrong var type of the key of put op , %T \n ", op_list[1] )
+                    key:=op_list[1]
+                    if len(key)==0{
+                        return nil , fmt.Errorf("error, empty string for the key of delete op , %T \n ", op_list[1] )
                     }else{
-                        if len(key)==0{
-                            return nil , fmt.Errorf("error, empty string for the key of delete op , %T \n ", op_list[1] )
+                        for _ , y := range allKey {
+                            if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                                return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
+                            }
+                        }                            
+                        allKey=append(allKey , key )
+                        if op_list[0]==TxnDelKeyWithPrefix{
+                            result=append( result ,clientv3.OpDelete( key , clientv3.WithPrefix() ) )
                         }else{
-                            for _ , y := range allKey {
-                                if y==key {
-                                    return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
-                                }
-                            }                            
-                            allKey=append(allKey , key )
-                            result=append( result ,TxnOpDelete( key ) )
+                            result=append( result ,clientv3.OpDelete( key ) )
                         }
                     }
-
-                }else{
-                    return nil , fmt.Errorf("error, unsupported op")
-                }
-
+                    
             default:
-                fmt.Printf("error item list  , %T \n" , op_list[0] )
+                fmt.Printf("error op  , %v \n" , op_list[0] )
             } 
 
         }else{
-            return nil , fmt.Errorf("error item , %v \n" , op_list)    
+            return nil , fmt.Errorf("error op list , %v \n" , op_list)    
         }
     }
     return  result , nil 

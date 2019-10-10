@@ -268,7 +268,7 @@ func Test_watch2(t *testing.T){
 	defer c.Close()
 
 
-	ch_close_watch , err :=c.WatchByHandler( "/a1" , true , watchCallBacker )
+	ch_close_watch , err :=c.WatchByHandler( "/a1" , true , false, true , watchCallBacker )
 	if err!=nil{
 		fmt.Println(  "failed to watch" )
 		t.FailNow()		
@@ -437,21 +437,25 @@ func Test_txn_exec (t *testing.T){
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 
+	if  c.Put("v2" , "110") != nil {
+		fmt.Println("failed to put etcd")
+		t.FailNow()		
+	}
+
 
 	// 注意：不能对同一个 key 做多个 put 和 delete 操作 
 	err := c.TxnExec( []interface{} {
-		[]interface{}{ etcd.TxnOpPut , "v1" , "110" },
-		[]interface{}{ etcd.TxnOpDelete , "v2" },
+		[]string { etcd.TxnPutKey , "flag1" , "500"},
+		[]string { etcd.TxnDelKey , "flag2" },
+		[]string { etcd.TxnDelKeyWithPrefix , "v" },
 
 	})
 	if err!=nil {
 		fmt.Printf(  "failed to Test_txn_exec , %v" , err )		
 		t.FailNow()
+	}else{
+		fmt.Printf(  "succeeded to Test_txn_exec \n"  )		
 	}
-
-
-	time.Sleep(10*time.Second)
-
 
 }
 
@@ -480,29 +484,27 @@ func Test_txn_compare (t *testing.T){
 		t.FailNow()		
 	}
 
-	
-
-
 
 
 	//只要有一个compare是失败的，就执行else，否则执行then
 	cmplist  := []etcd.TxnCmpStruct {
-		etcd.TxnCompare(etcd.Value("v1"), "=", "100") ,
-		etcd.TxnCompare(etcd.Value("v2"), "!=", "111") ,
-		etcd.TxnCompare(etcd.Value("v2"), ">", "100") ,
-		etcd.TxnCompare(etcd.Value("v2"), "<", "200") ,
+		etcd.TxnCompare(etcd.TxnValue("v1"), "=", "100") ,
+		etcd.TxnCompare(etcd.TxnValue("v2"), "!=", "111") ,
+		etcd.TxnCompare(etcd.TxnValue("v2"), ">", "100") ,
+		etcd.TxnCompare(etcd.TxnValue("v2"), "<", "200") ,
 	}
 	// 注意：不能多个op 对同一个 key 做操作 	
 	thenlist := []interface{}{
-		[]interface{}{ etcd.TxnOpPut , "flag1" , "100"},
-		[]interface{}{ etcd.TxnOpDelete , "flag2" },
+		[]string { etcd.TxnPutKey , "flag1" , "100"},
+		[]string { etcd.TxnDelKey , "flag2" },
+		[]string { etcd.TxnDelKeyWithPrefix , "v" },
 	}
 
 	//can do nothing
 	elselist:=[]interface{}{}
 	// elselist:= []interface{}{
-	// 	[]interface{}{ etcd.TxnOpPut , "flag1" , "100"},
-	// 	[]interface{}{ etcd.TxnOpDelete , "flag2" },
+	// 	[]string{}{ etcd.TxnPutKey , "flag1" , "100"},
+	// 	[]string{}{ etcd.TxnDelKey , "flag2" },
 	// }
 
 	thenTrue, err := c.TxnExecCmpValue(  cmplist , thenlist , elselist )
@@ -519,10 +521,6 @@ func Test_txn_compare (t *testing.T){
 		t.FailNow()
 
 	}
-
-
-	time.Sleep(10*time.Second)
-
 
 
 }
