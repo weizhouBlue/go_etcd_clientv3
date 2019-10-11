@@ -151,6 +151,44 @@ func Test_basic(t *testing.T){
 
 
 
+func Test_getPrefix(t *testing.T) {
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil  {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+
+
+/*
+针对 etcd 上的 各个key 是按照 层级 定义的 ， 进行 解析，返回带有层级的 object
+for example: etcd上 多个 key 和 其值 为如下 
+    /t/a/b3  500
+    /t/a/b2  400
+    /t/a/b   300
+    /t/mm/b5 500
+那么，本函数按照key的目录级别，返回  
+    map[a:map[b:300 b2:400 b3:500] mm:map[b5:500]]
+
+    注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
+        /t/mm/b5 500
+        /t/mm    600      这种key会被忽略记录    
+*/
+	if result , err:=c.GetPrefixReturnObj("/t" , true ) ; err!=nil {
+		fmt.Println( "err : " , err )
+	}else{
+		fmt.Println( "ok : " , result )
+	}
+
+
+}
+
+
 
 //====================================
 

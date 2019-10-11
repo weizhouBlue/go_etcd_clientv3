@@ -235,7 +235,7 @@ func (c *Client) GetListKey( keyList []string) ( map[string] string , error ) {
 }
 
 
-
+//---------------------------------------
 
 func (c *Client) GetPrefix( prefix string) ( map[string]string  , error  ) {
     log( "GetPrefix etcd  prefix=%s \n" , prefix  )
@@ -270,6 +270,121 @@ func (c *Client) GetPrefix( prefix string) ( map[string]string  , error  ) {
     return result , nil
 }
 
+
+
+//---------------------------------------
+
+
+// 根据 []string  作为各个层级的 目录名和文件名 ，记录到 record 的 对应层级中
+func recordToResult( dirList []string ,  val string  , record  map[string] interface{} ) error {
+
+    // 合并 两个  map[string] interface{}  的内容
+    insertNewItem:=func (  old  map[string] interface{} , newItem map[string] interface{} ) map[string] interface{} {
+        newone:=map[string] interface{} {}
+        for k , v :=range old {
+            newone[k]=v
+        }
+        for k , v :=range newItem {
+            newone[k]=v
+        }    
+        return newone
+    }
+
+    if len(dirList)==1 {
+        keyname:=dirList[0] 
+        if v , ok := record[keyname] ; ok {
+            // 发现 有 /a/b=100 , /a/b/c=20 的情况，即 第2个key把b当做目录，而第一个不是
+            return fmt.Errorf("error, %s is already a directory name with content \"%v\" , ignore setting to \"%v\" " , keyname ,v ,val )
+        }
+        record[keyname]=val
+
+    }else{
+        dirName:=dirList[0]
+        tmp:=map[string] interface{} {}
+        if err:=recordToResult( dirList[1:] , val , tmp ) ; err!=nil {
+            return err
+        }
+        if _ , ok := record[dirName] ; ok{
+            if t , ok := record[dirName].( map[string] interface{}  ) ; ok {
+                record[dirName]= insertNewItem(t , tmp)
+            }
+        }else{
+            record[dirName]=tmp
+        }
+    }
+
+    return nil
+}
+
+
+/*
+针对 etcd 上的 各个key 是按照 层级 定义的 ， 进行 解析，返回带有层级的 object
+for example: etcd上 多个 key 和 其值 为如下 
+    /t/a/b3  500
+    /t/a/b2  400
+    /t/a/b   300
+    /t/mm/b5 500
+那么，本函数按照key的目录级别，返回  
+    map[a:map[b:300 b2:400 b3:500] mm:map[b5:500]]
+
+    注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
+        /t/mm/b5 500
+        /t/mm    600      这种key会被忽略记录    
+*/
+
+func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[string] interface{}  , error  ) {
+
+    // 返回的结果中，保障 re 的结果是 有序排列
+    re , err := c.GetPrefix(prefix )
+    if err!=nil {
+        return nil , err
+    }
+    log( "after getting from etcd=%v \n " , re )
+
+    result:=map[string] interface{} {}
+    log( "begin to parse object \n " )
+    for key , val := range re {
+        log("parse %v=%v \n"  , key , val)
+
+        if strings.HasSuffix( key , "/" ) {
+            //  key 不能是  /a/b/c/  这种格式，即最后没有文件名
+            if ignoreErrKey==true {
+                fmt.Printf("error, ignore key=%s , errinfo=illeage format \n" , key  )
+            }else{
+                return nil , fmt.Errorf("error, found an key with illeage format, %s " , key )                
+            }
+        } 
+        if strings.Contains( key , "//" ) {
+            //  key 不能是  /a//b/c/  这种格式，即层级路径 错误
+            if ignoreErrKey==true {
+                fmt.Printf("error, ignore key=%s , errinfo=illeage format // \n" , key  )
+            }else{
+                return nil , fmt.Errorf("error, found an key with illeage format, %s " , key )                
+            }
+        }
+
+        newKey:=strings.TrimLeft( key , prefix )
+        newKey=strings.TrimLeft( newKey , "/" )
+
+        if err:=recordToResult( strings.Split(newKey , "/") , val , result ) ; err!=nil {
+            // 多个key ， 把 某个层级 作为 目录还是文件名 ， 出现冲突
+            if ignoreErrKey==true {
+                fmt.Printf("error, ignore key=%s , errinfo=%v \n" , key , err )
+            }else{
+                return nil , fmt.Errorf("error, key=%s confict with other key " , key )                
+            }
+
+        }
+    }
+    
+    return  result , nil
+
+}
+
+
+
+
+//---------------------------------------
 
 
 func (c *Client) Delete( key string , prefixFlag bool  ) error {
