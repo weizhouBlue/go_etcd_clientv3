@@ -163,8 +163,6 @@ func Test_getPrefix(t *testing.T) {
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 
-
-
 /*
 针对 etcd 上的 各个key 是按照 层级 定义的 ， 进行 解析，返回带有层级的 object
 for example: etcd上 多个 key 和 其值 为如下 
