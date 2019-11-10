@@ -173,6 +173,7 @@ func (c *Client) Put( key string , value string  , lease_id ... clientv3.LeaseID
 
 
 
+// 如果key 不存在 ，则值为空串
 func (c *Client) Get( key string) (string , error ) {
     log( "get etcd  key=%s \n" , key  )
 
@@ -205,6 +206,7 @@ func (c *Client) Get( key string) (string , error ) {
 
 
 
+// 如果key 不存在 ，则值为空串
 func (c *Client) GetListKey( keyList []string) ( map[string] string , error ) {
     log( "get etcd  keyList=%+v \n" , keyList  )
 
