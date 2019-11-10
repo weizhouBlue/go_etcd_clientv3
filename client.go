@@ -324,8 +324,11 @@ for example: etcd上 多个 key 和 其值 为如下
     /t/a/b2  400
     /t/a/b   300
     /t/mm/b5 500
-那么，本函数按照key的目录级别，返回  
-    map[a:map[b:300 b2:400 b3:500] mm:map[b5:500]]
+那么，本函数 获取prefix=/t , 按照key的目录级别(去掉前缀) , 返回  
+    map[
+        a:map[ b:300 b2:400 b3:500 ] 
+        mm:map[b5:500] 
+        ]
 
     注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
         /t/mm/b5 500
@@ -363,8 +366,8 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
             }
         }
 
-        newKey:=strings.TrimLeft( key , prefix )
-        newKey=strings.TrimLeft( newKey , "/" )
+        newKey:=strings.TrimPrefix( key , prefix )
+        newKey=strings.TrimPrefix( newKey , "/" )
 
         if err:=recordToResult( strings.Split(newKey , "/") , val , result ) ; err!=nil {
             // 多个key ， 把 某个层级 作为 目录还是文件名 ， 出现冲突
@@ -381,6 +384,56 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
 
 }
 
+
+
+/*
+针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 最后的名字
+for example: etcd上 多个 key 和 其值 为如下 
+    /t/a/b3  500
+    /t/a/b2  400
+    /t/a/b   300
+    /t/mm/b5 500
+
+那么，  返回
+    map[ b3:500 b2:400 b:300 b5:500 ]
+
+    注意，不能出现如下这种key , 即 最后的 / 的没有名字
+        /t/mm/  500
+*/
+func (c *Client) GetPrefixReturnEndName( prefix string  , ignoreErrKey bool  ) ( map[string] string   , error  ) {
+
+    // 返回的结果中，保障 re 的结果是 有序排列
+    re , err := c.GetPrefix(prefix )
+    if err!=nil {
+        return nil , err
+    }
+    log( "after getting from etcd=%v \n " , re )
+
+    result:=map[string] string {}
+    log( "begin to parse object \n " )
+    for k , v := range re {
+    log( "%v=%v\n " , k , v  )
+
+        tmp:=strings.Split(k,"/")
+        if len(tmp)==0  {
+            if ignoreErrKey{
+                continue
+            }else{
+                return nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+            }
+        }
+        endName:=tmp[ len(tmp) -1 ]
+        if len(endName) == 0 {
+            if ignoreErrKey{
+                continue
+            }else{
+                return nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+            }
+        }
+        result[endName]=v
+    }
+    return result , nil
+}
 
 
 
@@ -822,17 +875,19 @@ func convertOpSlice( OpsList []interface{} ) ( []clientv3.Op , error ) {
 
     for _, item_list := range OpsList {
         if op_list , ok := item_list.( []string ) ; ok {
-             
+            if len(op_list)<2 {
+                return nil , fmt.Errorf("error, no enough parameter to convertOpSlice "  )
+            }
             switch op_list[0] {
             case TxnPutKey :
-                    log("put op")
+                    log("put op: %v \n" ,op_list  )
                     if len(op_list)!=3{
                         return nil , fmt.Errorf("error, wrong number of variable for put op"  )
                     }
                     key:=op_list[1]
                     value:=op_list[2]
                     if len(key)==0{
-                        return nil , fmt.Errorf("error, empty string for the key of put op , %T \n ", op_list[1] )
+                        return nil , fmt.Errorf("error, empty key string for the key of put op , %T \n ", op_list[1] )
                     }else{
                         for _ , y := range allKey {
                             if strings.Contains(y , key ) || strings.Contains(y , key ) {
@@ -845,7 +900,7 @@ func convertOpSlice( OpsList []interface{} ) ( []clientv3.Op , error ) {
                     
 
             case TxnDelKey , TxnDelKeyWithPrefix :
-                    log("delete op")
+                    log("delete op: %v \n" , op_list )
                     if len(op_list)!=2 {
                         return nil , fmt.Errorf("error, wrong number of variable for delete op")
                     }
@@ -884,6 +939,11 @@ func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOpsList []interf
 
     if c.cli == nil {
         return  false , fmt.Errorf( "CLient has not connected to the server" )
+    }
+
+    if thenOpsList==nil && elseOpsList==nil {
+        return false, fmt.Errorf( "both if and else is nill" )
+
     }
 
     thenOpsRe , erra :=convertOpSlice( thenOpsList )
