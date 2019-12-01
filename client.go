@@ -387,6 +387,7 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
 }
 
 
+//---------------------------------------
 
 /*
 针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 最后的名字
@@ -436,6 +437,96 @@ func (c *Client) GetPrefixReturnEndName( prefix string  , ignoreErrKey bool  ) (
     }
     return result , nil
 }
+
+
+
+
+//---------------------------------------
+
+/*
+返回前缀的第一层级下的 目录名 和 键
+
+针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 第一层的名字
+for example: etcd上 多个 key 和 其值 为如下 
+    /t/b/b3  500
+    /t/b/b2  400
+    /t/a     300
+    /t/a/a1  200
+    /t/mm    500
+
+那么， 按照前缀 /t 来调用函数，那么2个结构
+    第一个是 目录列表：  list[ b , a ]
+    第二个是 keys字典：  map[a:"300" , mm:"500"]
+
+    注意，不能出现如下这种key , 即 最后的 / 的没有名字
+        /t/mm/  500
+*/
+
+
+func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) {
+
+    // 返回的结果中，保障 re 的结果是 有序排列
+    re , err := c.GetPrefix(prefix )
+    if err!=nil {
+        return nil, nil , err
+    }
+    log( "after getting from etcd=%v \n " , re )
+
+    tmp_dirs:=map[string]string {}
+    dirs=[]string {}
+    keys=map[string] string {}
+
+    log( "begin to parse object \n " )
+    for k , v := range re {
+
+        k=strings.TrimPrefix( k , prefix )
+        k=strings.TrimPrefix( k , "/" )
+        log( "%v=%v\n " , k , v  )
+
+        tmp:=strings.Split(k,"/")
+        n:=len(tmp)
+        if n==0 {
+            if ignoreErrKey{
+                continue
+            }else{
+                return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+            }
+
+        } else if n==1  {
+            // keys
+            topName:=tmp[0]
+            if len(topName)==0 {
+                if ignoreErrKey{
+                    continue
+                }else{
+                    return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+                }
+            }
+            keys[topName]=v
+
+        }else {
+            //diretory
+            topName:=tmp[0]
+            if len(topName)==0 {
+                if ignoreErrKey{
+                    continue
+                }else{
+                    return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+                }
+            }
+            tmp_dirs[topName]=""
+        }
+    }
+
+    for k , _ := range tmp_dirs {
+        dirs=append(dirs,k)
+    }
+
+    return
+}
+
+
+
 
 
 

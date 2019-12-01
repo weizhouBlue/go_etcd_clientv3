@@ -184,8 +184,35 @@ for example: etcd上 多个 key 和 其值 为如下
 	}
 
 
+
 }
 
+
+
+
+func Test_getPrefixTop(t *testing.T) {
+	log.Config(  log.Debug , " test module" , "" )  
+
+	var c etcd.Client
+
+	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil  {
+		fmt.Println(  "failed to connect to etcd server" )
+		t.FailNow()
+	}
+	fmt.Println( "succeeded to connect to etcd server" )
+	defer c.Close()
+
+	if dirs , keys , err:=c.GetPrefixReturnTopName("/t" , true ) ; err!=nil {
+		fmt.Println( "err : " , err )
+	}else{
+		fmt.Println( "dirs : " , dirs )
+		fmt.Println( "keys : " , keys )
+
+	}
+
+
+
+}
 
 
 //====================================
