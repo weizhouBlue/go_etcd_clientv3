@@ -464,8 +464,12 @@ for example: etcd上 多个 key 和 其值 为如下
 
 
 那么， 按照前缀 /t ， level=2 来调用函数，那么2个结构
-    第一个是 目录列表：  list[ b3 ]
-    第二个是 keys字典：  map[b2:"400" , a1:"200"]
+    第一个是 目录列表：  list[ b/b3 ]
+    第二个是 keys字典：  map[ b/b2:"400" , a/a1:"200"]
+
+那么， 按照前缀 /t ， level=3 来调用函数，那么2个结构
+    第一个是 目录列表：  list[  ]
+    第二个是 keys字典：  map[ b/b4:"500" ]
 
 
     注意，不能出现如下这种key , 即 最后的 / 的没有名字
@@ -522,9 +526,17 @@ func (c *Client) GetPrefixReturnLevelName( prefix string  , level int , ignoreEr
                 }
 
                 if n==level  {
-                    keys[keyName]=v
+                    keys[k]=v
                 }else {
-                    tmp_dirs[keyName]=""
+                    newname:=""
+                    for q , w := range tmp {
+                        if q>=level {
+                            break
+                        }else{
+                            newname+="/"+w
+                        }
+                    }
+                    tmp_dirs[ strings.TrimPrefix(newname,"/") ]=""
                 }
             }
         }
