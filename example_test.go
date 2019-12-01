@@ -202,6 +202,33 @@ func Test_getPrefixTop(t *testing.T) {
 	fmt.Println( "succeeded to connect to etcd server" )
 	defer c.Close()
 
+
+	if dirs , keys , err:=c.GetPrefixReturnLevelName("/t" , 1 , true ) ; err!=nil {
+		fmt.Println( "err : " , err )
+	}else{
+		fmt.Println( "dirs : " , dirs )
+		fmt.Println( "keys : " , keys )
+
+	}
+
+
+	if dirs , keys , err:=c.GetPrefixReturnLevelName("/t" , 2 , true ) ; err!=nil {
+		fmt.Println( "err : " , err )
+	}else{
+		fmt.Println( "dirs : " , dirs )
+		fmt.Println( "keys : " , keys )
+
+	}
+
+	if dirs , keys , err:=c.GetPrefixReturnLevelName("/t" , 100 , true ) ; err!=nil {
+		fmt.Println( "err : " , err )
+	}else{
+		fmt.Println( "dirs : " , dirs )
+		fmt.Println( "keys : " , keys )
+
+	}
+
+
 	if dirs , keys , err:=c.GetPrefixReturnTopName("/t" , true ) ; err!=nil {
 		fmt.Println( "err : " , err )
 	}else{

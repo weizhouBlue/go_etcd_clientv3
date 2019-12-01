@@ -390,15 +390,18 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
 //---------------------------------------
 
 /*
+以每个 key 的最后一层名字 作为 key名
+
 针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 最后的名字
 for example: etcd上 多个 key 和 其值 为如下 
     /t/a/b3  500
     /t/a/b2  400
     /t/a/b   300
+    /t/a     350
     /t/mm/b5 500
 
-那么，  返回
-    map[ b3:500 b2:400 b:300 b5:500 ]
+那么，按照 /t 的前缀  返回
+    map[ b3:500 b2:400 b:300 b5:500 a:350 ]
 
     注意，不能出现如下这种key , 即 最后的 / 的没有名字
         /t/mm/  500
@@ -443,27 +446,39 @@ func (c *Client) GetPrefixReturnEndName( prefix string  , ignoreErrKey bool  ) (
 
 //---------------------------------------
 
-/*
-返回前缀的第一层级下的 目录名 和 键
 
-针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 第一层的名字
+/*
+返回前缀的  指定 层级下的 目录名 和 键
+其中，level 从 1 开始
+
 for example: etcd上 多个 key 和 其值 为如下 
-    /t/b/b3  500
+    /t/b/b3/b4  500
     /t/b/b2  400
     /t/a     300
     /t/a/a1  200
     /t/mm    500
 
-那么， 按照前缀 /t 来调用函数，那么2个结构
+那么， 按照前缀 /t ， level=1 来调用函数，那么2个结构
     第一个是 目录列表：  list[ b , a ]
     第二个是 keys字典：  map[a:"300" , mm:"500"]
+
+
+那么， 按照前缀 /t ， level=2 来调用函数，那么2个结构
+    第一个是 目录列表：  list[ b3 ]
+    第二个是 keys字典：  map[b2:"400" , a1:"200"]
+
 
     注意，不能出现如下这种key , 即 最后的 / 的没有名字
         /t/mm/  500
 */
 
 
-func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) {
+
+func (c *Client) GetPrefixReturnLevelName( prefix string  , level int , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) {
+
+    if level==0 {
+        return nil, nil , fmt.Errorf("error, level must be > 0 "  )
+    }
 
     // 返回的结果中，保障 re 的结果是 有序排列
     re , err := c.GetPrefix(prefix )
@@ -492,29 +507,26 @@ func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) (
                 return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
             }
 
-        } else if n==1  {
-            // keys
-            topName:=tmp[0]
-            if len(topName)==0 {
-                if ignoreErrKey{
-                    continue
-                }else{
-                    return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+        }else{
+            if n<level {
+                log(" ignore key= %s \n" , k)
+                continue
+            }else{
+                keyName:=tmp[level-1]
+                if len(keyName)==0 {
+                    if ignoreErrKey{
+                        continue
+                    }else{
+                        return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+                    }
                 }
-            }
-            keys[topName]=v
 
-        }else {
-            //diretory
-            topName:=tmp[0]
-            if len(topName)==0 {
-                if ignoreErrKey{
-                    continue
-                }else{
-                    return nil, nil , fmt.Errorf("error, invalid key=%s  " , k ) 
+                if n==level  {
+                    keys[keyName]=v
+                }else {
+                    tmp_dirs[keyName]=""
                 }
             }
-            tmp_dirs[topName]=""
         }
     }
 
@@ -527,6 +539,31 @@ func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) (
 
 
 
+/*
+返回前缀的第一层级下的 目录名 和 键
+
+针对 etcd 上的 各个key 是按照 /  层级 定义的 ， 进行 解析，返回一个字典，每个key是 第一层的名字
+for example: etcd上 多个 key 和 其值 为如下 
+    /t/b/b3  500
+    /t/b/b2  400
+    /t/a     300
+    /t/a/a1  200
+    /t/mm    500
+
+那么， 按照前缀 /t 来调用函数，那么2个结构
+    第一个是 目录列表：  list[ b , a ]
+    第二个是 keys字典：  map[a:"300" , mm:"500"]
+
+    注意，不能出现如下这种key , 即 最后的 / 的没有名字
+        /t/mm/  500
+*/
+
+
+func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) {
+
+    return c.GetPrefixReturnLevelName( prefix  , 1 , ignoreErrKey   )
+
+}
 
 
 
