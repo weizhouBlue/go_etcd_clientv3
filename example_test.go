@@ -412,7 +412,7 @@ func Test_lock(t *testing.T){
 
 	//ch_close:=c.TryLock("ccc" , 3  )
 	etcd.EnableLog=true
-	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 2 , 15  )
+	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 2 , 5  )
 	if err!=nil {
 		fmt.Println(  "failed to lock" )
 		c.Close()
@@ -432,7 +432,7 @@ func Test_lock(t *testing.T){
 	time.Sleep(10*time.Second)
 	 close(ch_close)
 	 <-wait_finish_closing
-
+	 
 }
 
 

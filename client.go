@@ -820,7 +820,6 @@ func (c *Client) TryLock( lockName string  , try_seconds_timeout , acquired_seco
             log( "%v \n" , err)
             return
         }
-        defer new_session.Close()
         mutex_lock := concurrency.NewMutex( new_session , lockName )
 
         var ctx context.Context
@@ -837,6 +836,7 @@ func (c *Client) TryLock( lockName string  , try_seconds_timeout , acquired_seco
         if err := mutex_lock.Lock( ctx ); err != nil {
             log( "failed to get lock %+v \n" , lockName  )    
             log( "%v" , err)
+            new_session.Close()
             return 
         }
         succeed_flag<-true
@@ -854,14 +854,18 @@ func (c *Client) TryLock( lockName string  , try_seconds_timeout , acquired_seco
             <-ch_unlock
             log( "user try to unlock %+v \n" , lockName  ) 
         }
-        defer close(wait_finish_closing)
 
         if err := mutex_lock.Unlock( context.TODO() ); err != nil {
             log( "failed to unlock %+v \n" , lockName  )    
             log( "%v" , err)
+            new_session.Close()
+            close(wait_finish_closing)
             return
         }
+        
         log( "succeeded to unlock %+v \n" , lockName  )        
+        new_session.Close()
+        close(wait_finish_closing)
         
     }()
 
