@@ -785,8 +785,9 @@ func (c *Client) deleteLease(lease_id clientv3.LeaseID ) error  {
 
 //=====================================================
 
-
-func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_unlock  , wait_finish_closing chan bool , er error  ) {
+// try_seconds_timeout: timout for trying to get lock , 0 for alway waiting 
+// acquired_seconds_timeout: timeout for auto release lock , 0 for no auto releasing
+func (c *Client) TryLock( lockName string  , try_seconds_timeout , acquired_seconds_timeout int  ) (ch_unlock  , wait_finish_closing chan bool , er error  ) {
     log( "lock for %+v \n" , lockName  )
 
     if c.cli == nil {
@@ -796,8 +797,11 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
     if len(lockName) == 0 {
         return nil  , nil , fmt.Errorf( "miss lockName" )    
     }
-    if acquire_seconds_timeout<0 {
-        return nil   , nil , fmt.Errorf( "erro acquire_seconds_timeout=%d " , acquire_seconds_timeout )  
+    if try_seconds_timeout<0 {
+        return nil   , nil , fmt.Errorf( "erro try_seconds_timeout=%d " , try_seconds_timeout )  
+    }
+    if acquired_seconds_timeout<0 {
+        return nil   , nil , fmt.Errorf( "erro acquired_seconds_timeout=%d " , acquired_seconds_timeout )  
     }
 
     succeed_flag:=make(chan bool)
@@ -820,9 +824,9 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         mutex_lock := concurrency.NewMutex( new_session , lockName )
 
         var ctx context.Context
-        if acquire_seconds_timeout>0 {
-            ctx, _ = context.WithTimeout(context.Background() , time.Duration(acquire_seconds_timeout) * time.Second )
-            log( "wait %d seconds for acquire lock=%+v \n" , acquire_seconds_timeout ,  lockName  )    
+        if try_seconds_timeout>0 {
+            ctx, _ = context.WithTimeout(context.Background() , time.Duration(try_seconds_timeout) * time.Second )
+            log( "wait %d seconds for acquire lock=%+v \n" , try_seconds_timeout ,  lockName  )    
         }else{
             ctx, _ = context.WithCancel(context.Background())
             log("wait  always for acquiring lock=%+v \n"  ,  lockName  )    
@@ -839,8 +843,17 @@ func (c *Client) TryLock( lockName string  , acquire_seconds_timeout int  ) (ch_
         log( "succeeded to lock %+v \n" , lockName  )
 
         //wait for unlocking
-        <-ch_unlock
-        log( "try to unlock %+v \n" , lockName  ) 
+        if acquired_seconds_timeout>0 {
+            select{
+            case <-ch_unlock : 
+                log( "user try to unlock %+v \n" , lockName  )
+            case <- time.After( time.Duration(acquired_seconds_timeout) * time.Second):
+                log( "timeout %v second, try to unlock %+v \n" ,acquired_seconds_timeout,  lockName  )
+            }
+        }else{
+            <-ch_unlock
+            log( "user try to unlock %+v \n" , lockName  ) 
+        }
         defer close(wait_finish_closing)
 
         if err := mutex_lock.Unlock( context.TODO() ); err != nil {

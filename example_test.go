@@ -411,28 +411,27 @@ func Test_lock(t *testing.T){
 
 
 	//ch_close:=c.TryLock("ccc" , 3  )
-	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 0  )
+	etcd.EnableLog=true
+	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 2 , 15  )
 	if err!=nil {
 		fmt.Println(  "failed to lock" )
+		c.Close()
 		t.FailNow()
 	}
 
-	fmt.Println(  "get lock" )
+	// fmt.Println(  "get lock" )
 
 
-	if c.Put("/a1" , "110")!= nil {
-		fmt.Println("failed to put etcd")
-		t.FailNow()		
-	}
+	// if c.Put("/a1" , "110")!= nil {
+	// 	fmt.Println("failed to put etcd")
+	// 	t.FailNow()		
+	// }
 
-
-
-	time.Sleep(10*time.Second)
-
-	close(ch_close)
-	<-wait_finish_closing
+	// time.Sleep(10*time.Second)
 
 	time.Sleep(10*time.Second)
+	 close(ch_close)
+	 <-wait_finish_closing
 
 }
 
