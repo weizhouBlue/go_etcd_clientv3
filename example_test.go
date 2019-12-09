@@ -402,7 +402,14 @@ func Test_lock(t *testing.T){
 
 	var c etcd.Client
 
-	if err:= c.Connect( []string {"http://127.0.0.1:2379" } ) ; err!=nil {
+	c = etcd.Client {
+		Tls_cert : "/Users/weizhoulan/Documents/gitDir/dce-parcel_test/common/etcd-client-cert/client.pem" ,
+		Tls_ca	: "/Users/weizhoulan/Documents/gitDir/dce-parcel_test/common/etcd-client-cert/ca.pem" ,
+		Tls_key : "/Users/weizhoulan/Documents/gitDir/dce-parcel_test/common/etcd-client-cert/client-key.pem" ,
+	}
+
+
+	if err:= c.Connect( []string {"https://10.6.185.160:23790" } ) ; err!=nil {
 		fmt.Println(  "failed to connect to etcd server" )
 		t.FailNow()
 	}
@@ -412,7 +419,7 @@ func Test_lock(t *testing.T){
 
 	//ch_close:=c.TryLock("ccc" , 3  )
 	etcd.EnableLog=true
-	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 2 , 5  )
+	ch_close , wait_finish_closing , err :=c.TryLock("ccc" , 2 , 15  )
 	if err!=nil {
 		fmt.Println(  "failed to lock" )
 		c.Close()
@@ -432,7 +439,7 @@ func Test_lock(t *testing.T){
 	time.Sleep(10*time.Second)
 	 close(ch_close)
 	 <-wait_finish_closing
-	 
+
 }
 
 

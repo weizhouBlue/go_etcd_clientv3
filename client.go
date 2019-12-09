@@ -1049,7 +1049,8 @@ func convertOpSlice( OpsList []interface{} ) ( []clientv3.Op , error ) {
                         return nil , fmt.Errorf("error, empty key string for the key of put op , %T \n ", op_list[1] )
                     }else{
                         for _ , y := range allKey {
-                            if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                            //if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                            if y==key   {
                                 return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
                             }
                         }
@@ -1068,7 +1069,8 @@ func convertOpSlice( OpsList []interface{} ) ( []clientv3.Op , error ) {
                         return nil , fmt.Errorf("error, empty string for the key of delete op , %T \n ", op_list[1] )
                     }else{
                         for _ , y := range allKey {
-                            if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                            //if strings.Contains(y , key ) || strings.Contains(y , key ) {
+                            if y==key   {
                                 return nil , fmt.Errorf("error, forbid to op two same key, key=%s \n ", key )
                             }
                         }                            
