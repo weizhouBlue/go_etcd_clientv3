@@ -173,9 +173,12 @@ for example: etcd上 多个 key 和 其值 为如下
 那么，本函数按照key的目录级别，返回  
     map[a:map[b:300 b2:400 b3:500] mm:map[b5:500]]
 
-    注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
+    ignoreErrKey 影响以下情况的返回情况：
+    1 注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
         /t/mm/b5 500
         /t/mm    600      这种key会被忽略记录    
+    2 注意: key 不能是  /a/b/c/  这种格式，即最后没有文件名 , 否则报错或者 忽略
+    3 注意: key 不能是  /a//b  这种格式，即带有两个 // , 否则报错或者 忽略 
 */
 	if result , err:=c.GetPrefixReturnObj("/t" , true ) ; err!=nil {
 		fmt.Println( "err : " , err )

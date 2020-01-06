@@ -332,9 +332,13 @@ for example: etcd上 多个 key 和 其值 为如下
         mm:map[b5:500] 
         ]
 
-    注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
+    ignoreErrKey 影响以下情况的返回情况：
+    1 注意，如果有两个key 中，对于某个层级是 目录还是最终的文件名  出现了分歧，会自动 忽略 其作为 文件的 case
         /t/mm/b5 500
         /t/mm    600      这种key会被忽略记录    
+    2 注意: key 不能是  /a/b/c/  这种格式，即最后没有文件名 , 否则报错或者 忽略
+    3 注意: key 不能是  /a//b  这种格式，即带有两个 // , 否则报错或者 忽略
+
 */
 
 func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[string] interface{}  , error  ) {
@@ -355,6 +359,7 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
             //  key 不能是  /a/b/c/  这种格式，即最后没有文件名
             if ignoreErrKey==true {
                 fmt.Printf("error, ignore key=%s , errinfo=illeage format \n" , key  )
+                continue
             }else{
                 return nil , fmt.Errorf("error, found an key with illeage format, %s " , key )                
             }
@@ -363,6 +368,7 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
             //  key 不能是  /a//b/c/  这种格式，即层级路径 错误
             if ignoreErrKey==true {
                 fmt.Printf("error, ignore key=%s , errinfo=illeage format // \n" , key  )
+                continue
             }else{
                 return nil , fmt.Errorf("error, found an key with illeage format, %s " , key )                
             }
