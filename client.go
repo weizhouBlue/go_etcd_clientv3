@@ -17,6 +17,42 @@ import (
     "fmt"
 )
 
+/*=====================================================
+
+func (c *Client) Connect( endpoints []string  )  error 
+func (c *Client) Close() 
+
+
+func (c *Client) Put( key string , value string  , lease_id ... clientv3.LeaseID ) error 
+func (c *Client) Get( key string) (string , error ) 
+func (c *Client) GetListKey( keyList []string) ( map[string] string , error ) 
+func (c *Client) Delete( key string , prefixFlag bool  ) error 
+
+
+func (c *Client) GetPrefix( prefix string) ( map[string]string  , error  ) 
+// 获取 指定目录下的 所有层级的key ， 返回的 map 内也按照 层级 生成
+func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[string] interface{}  , error  ) 
+// 获取 指定目录下的 所有层级的key ， 返回的 map 只是一层，按照每个key的 最终层级的endname来组织
+func (c *Client) GetPrefixReturnEndName( prefix string  , ignoreErrKey bool  ) ( map[string] string   , error  ) 
+// 获取 指定目录下的 指定层级的key ， 
+func (c *Client) GetPrefixReturnLevelName( prefix string  , level int , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) 
+// 获取 指定目录下的 第一层级的key ， 
+func (c *Client) GetPrefixReturnTopName( prefix string  , ignoreErrKey bool  ) ( dirs []string , keys map[string] string   , er error  ) 
+
+func (c *Client) WatchByHandler( key string , prefixFlag , ignoreDeleteEvent , ignorePutEvent bool , caller func(evnet EventWatch , key , newVal , oldVal string ) )  (ch_stop chan bool , err error )
+
+func (c *Client) PutWithLease( keyMap map[string]string , ttl int64 ) ( ch_delete_lease chan bool , leaseInfo LeaseInfo , erro error )  
+func (c *Client) TryLock( lockName string  , try_seconds_timeout , acquired_seconds_timeout int  ) (ch_unlock  , wait_finish_closing chan bool , er error  ) 
+func (c *Client) ElectLeader( topic  , myName string , acquire_seconds_timeout int ) ( ch_close , wait_finish_closing chan bool , er error ) 
+func (c *Client) GetElectLeader( topic string  ) (leader string  , er error ) 
+
+//条件性的 执行事务
+func (c *Client) TxnExecCmpValue( valueCmp []TxnCmpStruct , thenOpsList []interface{}  , elseOpsList []interface{} ) ( ifIsTrue bool , er error ) 
+// 无条件 执行事务
+func (c *Client) TxnExec( ops []interface{} ) error  
+
+
+=====================================================*/
 
 
 
@@ -239,6 +275,7 @@ func (c *Client) GetListKey( keyList []string) ( map[string] string , error ) {
 
 //---------------------------------------
 
+
 func (c *Client) GetPrefix( prefix string) ( map[string]string  , error  ) {
     log( "GetPrefix etcd  prefix=%s \n" , prefix  )
 
@@ -320,6 +357,8 @@ func recordToResult( dirList []string ,  val string  , record  map[string] inter
 
 
 /*
+用于 获取 多层级的 目录，生成多层级的 map
+
 针对 etcd 上的 各个key 是按照 层级 定义的 ， 进行 解析，返回带有层级的 object
 for example: etcd上 多个 key 和 其值 为如下 
     /t/a/b3  500
@@ -340,6 +379,8 @@ for example: etcd上 多个 key 和 其值 为如下
     3 注意: key 不能是  /a//b  这种格式，即带有两个 // , 否则报错或者 忽略
 
 */
+
+
 
 func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[string] interface{}  , error  ) {
 
@@ -394,6 +435,8 @@ func (c *Client) GetPrefixReturnObj( prefix string , ignoreErrKey bool ) ( map[s
 
 
 //---------------------------------------
+
+
 
 /*
 以每个 key 的最后一层名字 作为 key名
