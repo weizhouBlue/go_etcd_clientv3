@@ -1,6 +1,6 @@
 module github.com/weizhouBlue/go_etcd_clientv3
 
-go 1.12
+go 1.15
 
 require (
 	github.com/coreos/bbolt v1.3.3 // indirect
